@@ -33,6 +33,11 @@ public class ApplicationDbContext : DbContext
             
             entity.Property(e => e.PasswordHash)
                 .IsRequired();
+
+            entity.Property(e => e.RefreshTokenHash)
+                .HasMaxLength(256);
+
+            entity.Property(e => e.RefreshTokenExpiresAt);
             
             entity.Property(e => e.CreatedAt);
             
