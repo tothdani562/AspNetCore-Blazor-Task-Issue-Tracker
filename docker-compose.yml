@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tasktracker-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tasktracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tasktracker_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-tasktracker_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - tasktracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tasktracker} -d ${POSTGRES_DB:-tasktracker_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  tasktracker-network:
+    driver: bridge
