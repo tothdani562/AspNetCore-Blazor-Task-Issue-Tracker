@@ -1,0 +1,282 @@
+{
+  "info": {
+    "name": "TaskTracker - Iteration 1",
+    "description": "Docker + PostgreSQL + Domain + Health-check validation tests for TaskTracker Iteration 1\n\nIteráció 1 tesztek:\n- Health-check endpoint tesztelése adatbázis csatlakozással\n- API response shape validálása (success + data)\n- HTTP status kódok ellenőrzése\n- Response headers validálása\n- Adatbázis csatlakozási érvényesítés\n- Response time teljesítmény validálása\n- EF Core DbContext működési ellenőrzése",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Status code validation",
+              "pm.test('Status code is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// Response time validation",
+              "pm.test('Response time is less than 2000ms (first request can be slower due to EF Core)', function () {",
+              "  pm.expect(pm.response.responseTime).to.be.below(2000);",
+              "});",
+              "",
+              "// Parse response body",
+              "const responseJson = pm.response.json();",
+              "",
+              "// Validate response structure has 'success' property",
+              "pm.test('Response has success property', function () {",
+              "  pm.expect(responseJson).to.have.property('success');",
+              "});",
+              "",
+              "// Validate success property is boolean",
+              "pm.test('Success property is a boolean', function () {",
+              "  pm.expect(responseJson.success).to.be.a('boolean');",
+              "});",
+              "",
+              "// Validate response has 'data' property",
+              "pm.test('Response has data property', function () {",
+              "  pm.expect(responseJson).to.have.property('data');",
+              "});",
+              "",
+              "// Validate data is an object",
+              "pm.test('Data property is an object', function () {",
+              "  pm.expect(responseJson.data).to.be.an('object');",
+              "});",
+              "",
+              "// Validate the success value is true",
+              "pm.test('Health-check returns success: true', function () {",
+              "  pm.expect(responseJson.success).to.equal(true);",
+              "});",
+              "",
+              "// Validate response headers",
+              "pm.test('Content-Type is application/json', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+              "});",
+              "",
+              "// Validate response structure is valid JSON",
+              "pm.test('Response is valid JSON', function () {",
+              "  pm.response.to.be.json;",
+              "});",
+              "",
+              "// Validate response body length",
+              "pm.test('Response size is less than 5KB', function () {",
+              "  pm.expect(pm.response.text().length).to.be.below(5120);",
+              "});",
+              "",
+              "// Database connectivity indication",
+              "pm.test('Response indicates successful API initialization with EF Core', function () {",
+              "  pm.expect(responseJson.success).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            ""
+          ]
+        },
+        "description": "Health-check endpoint with PostgreSQL + EF Core integration.\n\nIteráció 1 követelmények:\n- Docker Compose PostgreSQL konténer fut\n- EF Core DbContext konfigurálva van\n- Initial migration lefutott\n- User entitás kialakult\n\nExpected response format:\n```json\n{\n  \"success\": true,\n  \"data\": {}\n}\n```\n\nEz a végpont igazolja, hogy az alkalmazás elérhető, az adatbázis csatlakozásként működik, és az API response shape helyesen van konfigurálva."
+      },
+      "response": [
+        {
+          "name": "Success - Health Check with Database",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "21"
+            }
+          ],
+          "body": "{\"success\":true,\"data\":{}}"
+        }
+      ]
+    },
+    {
+      "name": "Database Health Check - Connectivity Test",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Verify API responds with 200 for successful database connection",
+              "pm.test('Status code is 200 - Database connected', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// Parse response",
+              "const responseJson = pm.response.json();",
+              "",
+              "// Validate response structure",
+              "pm.test('Response has success property', function () {",
+              "  pm.expect(responseJson).to.have.property('success');",
+              "  pm.expect(responseJson.success).to.equal(true);",
+              "});",
+              "",
+              "// Validate data contains database status",
+              "pm.test('Response contains database status', function () {",
+              "  pm.expect(responseJson.data).to.have.property('status');",
+              "  pm.expect(responseJson.data.status).to.equal('database_connected');",
+              "});",
+              "",
+              "// Validate User table query result",
+              "pm.test('Response contains userCount from database query', function () {",
+              "  pm.expect(responseJson.data).to.have.property('userCount');",
+              "  pm.expect(responseJson.data.userCount).to.be.a('number');",
+              "});",
+              "",
+              "// Validate response contains timestamp",
+              "pm.test('Response contains timestamp', function () {",
+              "  pm.expect(responseJson.data).to.have.property('timestamp');",
+              "});",
+              "",
+              "// Response time benchmark",
+              "pm.test('Response time acceptable for database query (<2000ms)', function () {",
+              "  pm.expect(pm.response.responseTime).to.be.below(2000);",
+              "});",
+              "",
+              "// Store successful response",
+              "pm.environment.set('lastDbHealthCheck', JSON.stringify(responseJson.data));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/health/db",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health",
+            "db"
+          ]
+        },
+        "description": "Database connectivity test endpoint - valós adatbázis query futtatásával.\n\nEz a végpont:\n- Teszteli a PostgreSQL adatbázis csatlakozást\n- Valós User tábla lekérdezést végez (COUNT query)\n- EF Core DbContext működésének igazolása\n\nExpected response format:\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"status\": \"database_connected\",\n    \"timestamp\": \"2026-03-31T12:00:00.000Z\",\n    \"userCount\": 0,\n    \"version\": \"0.1.0\"\n  }\n}\n```\n\nHiba esetén (503 Service Unavailable):\n```json\n{\n  \"success\": false,\n  \"data\": {\n    \"status\": \"database_unavailable\",\n    \"timestamp\": \"2026-03-31T12:00:00.000Z\",\n    \"error\": \"Exception message\"\n  }\n}\n```"
+      },
+      "response": [
+        {
+          "name": "Success - Database Connected",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health/db",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "db"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ],
+          "body": "{\"success\":true,\"data\":{\"status\":\"database_connected\",\"timestamp\":\"2026-03-31T12:00:00.000Z\",\"userCount\":0,\"version\":\"0.1.0\"}}"
+        },
+        {
+          "name": "Error - Database Unavailable",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health/db",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "db"
+              ]
+            }
+          },
+          "status": "Service Unavailable",
+          "code": 503,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ],
+          "body": "{\"success\":false,\"data\":{\"status\":\"database_unavailable\",\"timestamp\":\"2026-03-31T12:00:00.000Z\",\"error\":\"Connection refused\"}}"
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5271",
+      "type": "string"
+    }
+  ]
+}
