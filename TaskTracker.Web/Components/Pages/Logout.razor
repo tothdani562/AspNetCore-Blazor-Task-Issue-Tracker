@@ -1,0 +1,16 @@
+@page "/logout"
+@rendermode InteractiveServer
+@inject AuthFacade AuthFacade
+@inject NavigationManager NavigationManager
+
+<PageTitle>Logout</PageTitle>
+
+<p>Kijelentkezes folyamatban...</p>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthFacade.LogoutAsync();
+        NavigationManager.NavigateTo("/login", forceLoad: false);
+    }
+}
