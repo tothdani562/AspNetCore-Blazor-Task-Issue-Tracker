@@ -8,6 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
+    <None Remove="Tests\**\*" />
+    <Content Remove="Tests\**\*" />
+    <EmbeddedResource Remove="Tests\**\*" />
+    <UpToDateCheckInput Remove="Tests\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="FluentValidation" Version="11.10.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
