@@ -53,6 +53,14 @@ public class ExceptionHandlingMiddleware
                 response.StatusCode = StatusCodes.Status409Conflict;
                 context.Response.StatusCode = StatusCodes.Status409Conflict;
                 break;
+            case ForbiddenException:
+                response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                break;
+            case NotFoundException:
+                response.StatusCode = StatusCodes.Status404NotFound;
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                break;
             case UnauthorizedAccessException:
                 response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;

@@ -5,6 +5,7 @@ using TaskTracker.Web.Auth;
 using TaskTracker.Web.Dtos;
 using TaskTracker.Web.Services;
 using TaskTracker.Web.Services.Auth;
+using TaskTracker.Web.Services.Projects;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -73,6 +74,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddHttpClient("TaskTrackerApi");
 builder.Services.AddScoped<IAuthSessionStore, AuthSessionStore>();
 builder.Services.AddScoped<IAuthTokenStorage, BrowserAuthTokenStorage>();
@@ -129,31 +131,35 @@ if (builder.Environment.IsDevelopment())
 
 var app = builder.Build();
 
-// Database initialization
-using (var scope = app.Services.CreateScope())
+if (!app.Environment.IsEnvironment("Testing"))
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    try
+    // Database initialization
+    using (var scope = app.Services.CreateScope())
     {
-        // Apply pending migrations
-        if (dbContext.Database.GetPendingMigrations().Any())
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        try
         {
-            app.Logger.LogInformation("Applying pending migrations...");
-            dbContext.Database.Migrate();
-            app.Logger.LogInformation("Migrations applied successfully.");
-        }
-        else
-        {
-            app.Logger.LogInformation("No pending migrations found.");
-        }
+            if (dbContext.Database.IsRelational())
+            {
+                app.Logger.LogInformation("Applying database migrations...");
+                dbContext.Database.Migrate();
+                app.Logger.LogInformation("Database migrations applied successfully.");
 
-        // Seed initial data if needed
-        SeedData(dbContext, app.Logger);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "An error occurred while initializing the database.");
-        throw;
+                EnsureProjectSchema(dbContext, app.Logger);
+            }
+            else
+            {
+                app.Logger.LogInformation("Skipping migrations because the current provider is not relational.");
+            }
+
+            // Seed initial data if needed
+            SeedData(dbContext, app.Logger);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "An error occurred while initializing the database.");
+            throw;
+        }
     }
 }
 
@@ -241,5 +247,42 @@ static void SeedData(ApplicationDbContext dbContext, ILogger logger)
         logger.LogError(ex, "An error occurred while seeding the database.");
         throw;
     }
+}
+
+static void EnsureProjectSchema(ApplicationDbContext dbContext, ILogger logger)
+{
+    logger.LogWarning("Projects tables are missing. Recreating project schema.");
+
+    dbContext.Database.ExecuteSqlRaw(@"
+CREATE TABLE IF NOT EXISTS ""Projects"" (
+    ""Id"" uuid NOT NULL,
+    ""Name"" character varying(100) NOT NULL,
+    ""Description"" character varying(1000) NULL,
+    ""OwnerId"" uuid NOT NULL,
+    ""CreatedAt"" timestamp with time zone NOT NULL,
+    ""UpdatedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_Projects"" PRIMARY KEY (""Id""),
+    CONSTRAINT ""FK_Projects_Users_OwnerId"" FOREIGN KEY (""OwnerId"") REFERENCES ""Users"" (""Id"") ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS ""IX_Projects_OwnerId"" ON ""Projects"" (""OwnerId"");
+
+CREATE TABLE IF NOT EXISTS ""ProjectMembers"" (
+    ""ProjectId"" uuid NOT NULL,
+    ""UserId"" uuid NOT NULL,
+    ""JoinedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_ProjectMembers"" PRIMARY KEY (""ProjectId"", ""UserId""),
+    CONSTRAINT ""FK_ProjectMembers_Projects_ProjectId"" FOREIGN KEY (""ProjectId"") REFERENCES ""Projects"" (""Id"") ON DELETE CASCADE,
+    CONSTRAINT ""FK_ProjectMembers_Users_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""Users"" (""Id"") ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ""IX_ProjectMembers_UserId"" ON ""ProjectMembers"" (""UserId"");
+    ");
+
+    logger.LogInformation("Project schema recreated successfully.");
+}
+
+public partial class Program
+{
 }
 
