@@ -58,3 +58,13 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+.auth-loading {
+    padding: 1rem 1.5rem;
+    color: #4a4a4a;
+}
+
+.nav-user-info {
+    font-weight: 600;
+    opacity: 0.95;
+}

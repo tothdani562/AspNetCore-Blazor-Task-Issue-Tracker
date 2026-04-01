@@ -1,0 +1,10 @@
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        var currentUri = new Uri(NavigationManager.Uri);
+        var returnUrl = Uri.EscapeDataString(currentUri.PathAndQuery);
+        NavigationManager.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: false);
+    }
+}

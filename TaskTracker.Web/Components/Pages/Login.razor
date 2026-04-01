@@ -1,0 +1,77 @@
+@page "/login"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.WebUtilities
+@inject AuthFacade AuthFacade
+@inject NavigationManager NavigationManager
+
+<PageTitle>Login</PageTitle>
+
+<h1>Bejelentkezes</h1>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+
+<EditForm Model="_model" OnValidSubmit="HandleSubmitAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label" for="email">Email</label>
+        <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+        <ValidationMessage For="@(() => _model.Email)" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="password">Jelszo</label>
+        <InputText id="password" type="password" class="form-control" @bind-Value="_model.Password" />
+        <ValidationMessage For="@(() => _model.Password)" />
+    </div>
+
+    <button class="btn btn-primary" type="submit" disabled="@_isSubmitting">
+        @(_isSubmitting ? "Bejelentkezes..." : "Bejelentkezes")
+    </button>
+</EditForm>
+
+<p class="mt-3">
+    Nincs meg fiokod? <a href="/register">Regisztracio</a>
+</p>
+
+@code {
+    private readonly LoginRequestDto _model = new();
+    private string _returnUrl = "/home";
+    private string? _errorMessage;
+    private bool _isSubmitting;
+
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("returnUrl", out var returnUrl) &&
+            !string.IsNullOrWhiteSpace(returnUrl))
+        {
+            _returnUrl = returnUrl.ToString();
+        }
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            await AuthFacade.LoginAsync(_model);
+            NavigationManager.NavigateTo(_returnUrl, forceLoad: false);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

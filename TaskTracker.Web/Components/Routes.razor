@@ -1,6 +1,40 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+﻿@rendermode InteractiveServer
+@inject AuthFacade AuthFacade
+
+@if (!_isReady)
+{
+    <div class="auth-loading">Session betoltese...</div>
+}
+else
+{
+    <CascadingAuthenticationState>
+        <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+            <Found Context="routeData">
+                <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                    <NotAuthorized>
+                        <LayoutView Layout="typeof(Layout.MainLayout)">
+                            <RedirectToLogin />
+                        </LayoutView>
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+                <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            </Found>
+        </Router>
+    </CascadingAuthenticationState>
+}
+
+@code {
+    private bool _isReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AuthFacade.RestoreSessionAsync();
+        _isReady = true;
+        StateHasChanged();
+    }
+}

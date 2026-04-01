@@ -4,7 +4,9 @@ using TaskTracker.Web.Data;
 using TaskTracker.Web.Auth;
 using TaskTracker.Web.Dtos;
 using TaskTracker.Web.Services;
+using TaskTracker.Web.Services.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -68,7 +70,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddHttpClient("TaskTrackerApi");
+builder.Services.AddScoped<IAuthSessionStore, AuthSessionStore>();
+builder.Services.AddScoped<IAuthTokenStorage, BrowserAuthTokenStorage>();
+builder.Services.AddScoped<IAuthApiClient, AuthApiClient>();
+builder.Services.AddScoped<AuthFacade>();
+builder.Services.AddScoped<AppAuthenticationStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider>(
+    serviceProvider => serviceProvider.GetRequiredService<AppAuthenticationStateProvider>());
 
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
