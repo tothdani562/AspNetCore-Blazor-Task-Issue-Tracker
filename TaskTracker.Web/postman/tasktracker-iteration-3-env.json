@@ -1,0 +1,57 @@
+{
+  "id": "a2c7d3fb-10g7-5f97-ce68-c865gf3f9e5d",
+  "name": "TaskTracker - Iteration 3",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "authEmail",
+      "value": "",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "authPassword",
+      "value": "Passw0rd!123",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "authFullName",
+      "value": "Iteration 3 User",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "authAccessToken",
+      "value": "",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "authRefreshToken",
+      "value": "",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "authUserId",
+      "value": "",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "iteration3UniqueId",
+      "value": "",
+      "enabled": true,
+      "type": "string"
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-04-01T14:45:00.000Z",
+  "_postman_exported_using": "Postman/latest"
+}
