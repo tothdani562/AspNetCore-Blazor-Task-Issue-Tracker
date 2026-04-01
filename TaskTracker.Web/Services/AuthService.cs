@@ -84,6 +84,73 @@ public class AuthService : IAuthService
         return CreateAuthResponse(user, refreshToken);
     }
 
+    public async Task<AuthResponseDto> RefreshAsync(RefreshTokenRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var tokenHash = HashToken(request.RefreshToken);
+        var now = DateTime.UtcNow;
+
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(
+                x => x.RefreshTokenHash == tokenHash,
+                cancellationToken);
+
+        if (user is null)
+        {
+            throw new UnauthorizedAccessException("Ervenytelen refresh token.");
+        }
+
+        if (user.RefreshTokenExpiresAt < now)
+        {
+            throw new UnauthorizedAccessException("A refresh token lejart.");
+        }
+
+        var newRefreshToken = GenerateSecureToken();
+        var newRefreshTokenExpiresAt = now.AddDays(_jwtOptions.RefreshTokenExpirationDays);
+
+        user.RefreshTokenHash = HashToken(newRefreshToken);
+        user.RefreshTokenExpiresAt = newRefreshTokenExpiresAt;
+        user.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return CreateAuthResponse(user, newRefreshToken);
+    }
+
+    public async Task LogoutAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+
+        if (user is null)
+        {
+            throw new UnauthorizedAccessException("Felhasznalo nem talalhato.");
+        }
+
+        user.RefreshTokenHash = null;
+        user.RefreshTokenExpiresAt = null;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<AuthUserDto> GetMeAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+
+        if (user is null)
+        {
+            throw new UnauthorizedAccessException("Felhasznalo nem talalhato.");
+        }
+
+        return new AuthUserDto
+        {
+            Id = user.Id,
+            Email = user.Email,
+            FullName = user.FullName
+        };
+    }
+
     private AuthResponseDto CreateAuthResponse(User user, string refreshToken)
     {
         var accessTokenExpiresAt = DateTime.UtcNow.AddMinutes(_jwtOptions.AccessTokenExpirationMinutes);

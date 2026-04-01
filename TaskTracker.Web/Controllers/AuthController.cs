@@ -67,4 +67,77 @@ public class AuthController : ControllerBase
             }
         });
     }
+
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> Refresh(
+        [FromBody] RefreshTokenRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _authService.RefreshAsync(request, cancellationToken);
+
+        return Ok(new ApiResponse<AuthResponseDto>
+        {
+            Success = true,
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("logout")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<object>>> Logout(CancellationToken cancellationToken)
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Success = false,
+                StatusCode = StatusCodes.Status401Unauthorized,
+                Message = "Ervenytelen felhasznalo ID.",
+                Path = HttpContext.Request.Path,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        await _authService.LogoutAsync(userId, cancellationToken);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Data = new { message = "Sikeres kijelentkezes." }
+        });
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(ApiResponse<AuthUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<AuthUserDto>>> GetMe(CancellationToken cancellationToken)
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Success = false,
+                StatusCode = StatusCodes.Status401Unauthorized,
+                Message = "Ervenytelen felhasznalo ID.",
+                Path = HttpContext.Request.Path,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        var result = await _authService.GetMeAsync(userId, cancellationToken);
+
+        return Ok(new ApiResponse<AuthUserDto>
+        {
+            Success = true,
+            Data = result
+        });
+    }
 }

@@ -1,0 +1,501 @@
+{
+  "info": {
+    "name": "TaskTracker - Iteration 3",
+    "description": "Auth flow validation tests for TaskTracker Iteration 3.\n\nIteracao 3 tesztek:\n- POST /auth/register (context)\n- POST /auth/login (context)\n- POST /auth/refresh (new)\n- POST /auth/logout (new)\n- GET /auth/me (new)\n- Refresh token flow stabilization\n- Token invalidation strategy verification\n- Complete auth flow integration tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "1. Register - Setup User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const uniqueId = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
+                  "pm.environment.set('iteration3UniqueId', uniqueId);",
+                  "pm.environment.set('authEmail', `iteration3.${uniqueId}@example.com`);",
+                  "pm.environment.set('authPassword', 'Passw0rd!123');",
+                  "pm.environment.set('authFullName', 'Iteration 3 User');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has expected success shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('Response data contains tokens and user payload', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.refreshToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.accessTokenExpiresAt).to.be.a('string');",
+                  "  pm.expect(body.data.refreshTokenExpiresAt).to.be.a('string');",
+                  "  pm.expect(body.data.user).to.be.an('object');",
+                  "  pm.expect(body.data.user.id).to.be.a('string');",
+                  "  pm.expect(body.data.user.email).to.equal(pm.environment.get('authEmail').toLowerCase());",
+                  "  pm.expect(body.data.user.fullName).to.equal(pm.environment.get('authFullName'));",
+                  "});",
+                  "",
+                  "pm.test('Store auth variables from register response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('authAccessToken', body.data.accessToken);",
+                  "  pm.environment.set('authRefreshToken', body.data.refreshToken);",
+                  "  pm.environment.set('authUserId', body.data.user.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"fullName\": \"{{authFullName}}\",\n  \"password\": \"{{authPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Create a new user with a generated unique email and store auth variables for subsequent requests."
+          }
+        },
+        {
+          "name": "2. Login - Refresh Token Store",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has expected success shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('Login returns new tokens and user details', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.refreshToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.user.id).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.user.email).to.equal(pm.environment.get('authEmail').toLowerCase());",
+                  "});",
+                  "",
+                  "pm.test('Store new auth variables from login response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('authAccessToken', body.data.accessToken);",
+                  "  pm.environment.set('authRefreshToken', body.data.refreshToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login with the registered credentials to get fresh tokens."
+          }
+        },
+        {
+          "name": "3. GET /auth/me - Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has expected success shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('GET /auth/me returns correct user data', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.id).to.equal(pm.environment.get('authUserId'));",
+                  "  pm.expect(body.data.email).to.equal(pm.environment.get('authEmail').toLowerCase());",
+                  "  pm.expect(body.data.fullName).to.equal(pm.environment.get('authFullName'));",
+                  "});",
+                  "",
+                  "pm.test('User object has all required properties', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data).to.have.property('id');",
+                  "  pm.expect(body.data).to.have.property('email');",
+                  "  pm.expect(body.data).to.have.property('fullName');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Retrieve the current authenticated user's profile data."
+          }
+        },
+        {
+          "name": "4. POST /auth/refresh - Get New Access Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Store the old tokens for comparison later",
+                  "pm.environment.set('oldAccessToken', pm.environment.get('authAccessToken'));",
+                  "pm.environment.set('oldRefreshToken', pm.environment.get('authRefreshToken'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has expected success shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('Refresh response contains new tokens', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.refreshToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.user).to.be.an('object');",
+                  "});",
+                  "",
+                  "pm.test('New tokens are different from old tokens', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.accessToken).not.to.equal(pm.environment.get('oldAccessToken'));",
+                  "  pm.expect(body.data.refreshToken).not.to.equal(pm.environment.get('oldRefreshToken'));",
+                  "});",
+                  "",
+                  "pm.test('User data preserved in refresh response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.user.id).to.equal(pm.environment.get('authUserId'));",
+                  "  pm.expect(body.data.user.email).to.equal(pm.environment.get('authEmail').toLowerCase());",
+                  "});",
+                  "",
+                  "pm.test('Store new tokens from refresh response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('authAccessToken', body.data.accessToken);",
+                  "  pm.environment.set('authRefreshToken', body.data.refreshToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{authRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Use the refresh token to obtain new access and refresh tokens."
+          }
+        },
+        {
+          "name": "5. Verify New Access Token Works",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('New access token is valid', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.equal(true);",
+                  "  pm.expect(body.data.id).to.equal(pm.environment.get('authUserId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Verify that the newly refreshed access token is valid by calling /auth/me."
+          }
+        },
+        {
+          "name": "6. POST /auth/logout - Invalidate Refresh Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Store the refresh token before logout for later validation",
+                  "pm.environment.set('logoutRefreshToken', pm.environment.get('authRefreshToken'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response confirms logout success', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body.data.message).to.include('kijelentkezes');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Log out the current user, invalidating their refresh token."
+          }
+        },
+        {
+          "name": "7. Try Refresh with Invalid Token - Should Fail 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 401 (Unauthorized)', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Response follows error shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', false);",
+                  "  pm.expect(body).to.have.property('statusCode', 401);",
+                  "  pm.expect(body).to.have.property('message').that.is.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('Error message indicates token is invalid', function () {",
+                  "  const body = pm.response.json();",
+                  "  const msgLower = body.message.toLowerCase();",
+                  "  pm.expect(msgLower).to.be.oneOf(['ervenytelen', 'invalid']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{logoutRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Attempt to use the invalidated refresh token. Should return 401 Unauthorized."
+          }
+        },
+        {
+          "name": "8. Verify Protected Endpoint Requires Auth",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 401 (Request requires authentication)', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Attempt to access protected endpoint without bearing auth token."
+          }
+        }
+      ]
+    }
+  ]
+}
