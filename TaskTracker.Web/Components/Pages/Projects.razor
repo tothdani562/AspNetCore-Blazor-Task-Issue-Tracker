@@ -1,0 +1,213 @@
+@page "/app/projects"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@inject IProjectsApiClient ProjectsApiClient
+@inject IAuthSessionStore AuthSessionStore
+@inject NavigationManager NavigationManager
+
+<PageTitle>Projects</PageTitle>
+
+<h1>Projektek</h1>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(_successMessage))
+{
+    <div class="alert alert-success" role="alert">@_successMessage</div>
+}
+
+<section class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5">Uj projekt letrehozasa</h2>
+
+        <EditForm Model="_createModel" OnValidSubmit="HandleCreateAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label class="form-label" for="createProjectName">Nev</label>
+                <InputText id="createProjectName" class="form-control" @bind-Value="_createModel.Name" />
+                <ValidationMessage For="@(() => _createModel.Name)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="createProjectDescription">Leiras</label>
+                <InputTextArea id="createProjectDescription" class="form-control" @bind-Value="_createModel.Description" />
+                <ValidationMessage For="@(() => _createModel.Description)" />
+            </div>
+
+            <button class="btn btn-primary" type="submit" disabled="@_isCreating">
+                @(_isCreating ? "Letrehozas..." : "Projekt letrehozasa")
+            </button>
+        </EditForm>
+    </div>
+</section>
+
+@if (_isLoading)
+{
+    <p>Projektek betoltese...</p>
+}
+else if (_projects.Count == 0)
+{
+    <div class="alert alert-info" role="alert">
+        Meg nincs projekted. Hozz letre egyet a fenti urlappal.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Nev</th>
+                    <th>Tulajdonos</th>
+                    <th>Tagok</th>
+                    <th>Utolso modositas</th>
+                    <th class="text-end">Muveletek</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var project in _projects)
+                {
+                    var isOwner = project.Owner.Id == AuthSessionStore.CurrentUser?.Id;
+                    <tr>
+                        <td>
+                            <strong>@project.Name</strong>
+                            @if (!string.IsNullOrWhiteSpace(project.Description))
+                            {
+                                <div class="text-muted small">@project.Description</div>
+                            }
+                        </td>
+                        <td>@project.Owner.FullName</td>
+                        <td>@project.MemberCount</td>
+                        <td>@project.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary me-2"
+                                    type="button"
+                                    @onclick="() => OpenDetails(project.Id)">
+                                Megnyitas
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    type="button"
+                                    disabled="@(!isOwner || _isDeleting == project.Id)"
+                                    @onclick="() => HandleDeleteAsync(project.Id)">
+                                @(_isDeleting == project.Id ? "Torles..." : "Torles")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private readonly CreateProjectFormModel _createModel = new();
+    private List<ProjectListItemDto> _projects = new();
+    private string? _errorMessage;
+    private string? _successMessage;
+    private bool _isLoading = true;
+    private bool _isCreating;
+    private Guid? _isDeleting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProjectsAsync();
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await ProjectsApiClient.GetProjectsAsync();
+            _projects = result.OrderByDescending(project => project.UpdatedAt).ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleCreateAsync()
+    {
+        _isCreating = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            var created = await ProjectsApiClient.CreateProjectAsync(new CreateProjectRequestDto
+            {
+                Name = _createModel.Name,
+                Description = string.IsNullOrWhiteSpace(_createModel.Description) ? null : _createModel.Description
+            });
+
+            _createModel.Reset();
+            _successMessage = "A projekt sikeresen letrejott.";
+            NavigationManager.NavigateTo($"/app/projects/{created.Id}", forceLoad: false);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private async Task HandleDeleteAsync(Guid projectId)
+    {
+        _isDeleting = projectId;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            await ProjectsApiClient.DeleteProjectAsync(projectId);
+            _successMessage = "A projekt torolve lett.";
+            await LoadProjectsAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isDeleting = null;
+        }
+    }
+
+    private void OpenDetails(Guid projectId)
+    {
+        NavigationManager.NavigateTo($"/app/projects/{projectId}", forceLoad: false);
+    }
+
+    private sealed class CreateProjectFormModel
+    {
+        [Required(ErrorMessage = "A nev kotelezo.")]
+        [MinLength(3, ErrorMessage = "A nev legalabb 3 karakter legyen.")]
+        [MaxLength(100, ErrorMessage = "A nev legfeljebb 100 karakter lehet.")]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(1000, ErrorMessage = "A leiras legfeljebb 1000 karakter lehet.")]
+        public string? Description { get; set; }
+
+        public void Reset()
+        {
+            Name = string.Empty;
+            Description = string.Empty;
+        }
+    }
+}

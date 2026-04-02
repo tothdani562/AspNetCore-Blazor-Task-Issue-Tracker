@@ -1,0 +1,345 @@
+@page "/app/projects/{ProjectId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@inject IProjectsApiClient ProjectsApiClient
+@inject IAuthSessionStore AuthSessionStore
+@inject NavigationManager NavigationManager
+
+<PageTitle>Project details</PageTitle>
+
+<h1>Projekt reszletek</h1>
+
+@if (_isLoading)
+{
+    <p>Projekt betoltese...</p>
+}
+else if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_project is null)
+{
+    <div class="alert alert-warning" role="alert">A projekt nem talalhato.</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="alert alert-success" role="alert">@_successMessage</div>
+    }
+
+    <section class="mb-4">
+        <h2 class="h4">@_project.Name</h2>
+        <p class="mb-1 text-muted">Tulajdonos: @_project.Owner.FullName (@_project.Owner.Email)</p>
+        <p class="mb-1">Tagok szama: @_project.MemberCount</p>
+        <p class="mb-3 text-muted">Utolso modositas: @_project.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
+
+        @if (!string.IsNullOrWhiteSpace(_project.Description))
+        {
+            <div class="alert alert-secondary" role="alert">@_project.Description</div>
+        }
+        else
+        {
+            <p class="text-muted">Nincs leiras.</p>
+        }
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h5 mb-0">Projekt szerkesztese</h2>
+                @if (!IsOwner)
+                {
+                    <span class="badge text-bg-secondary">Csak tulajdonos szerkeszthet</span>
+                }
+            </div>
+
+            <EditForm Model="_updateModel" OnValidSubmit="HandleUpdateAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <fieldset disabled="@(!IsOwner || _isUpdating)">
+                    <div class="mb-3">
+                        <label class="form-label" for="projectName">Nev</label>
+                        <InputText id="projectName" class="form-control" @bind-Value="_updateModel.Name" />
+                        <ValidationMessage For="@(() => _updateModel.Name)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="projectDescription">Leiras</label>
+                        <InputTextArea id="projectDescription" class="form-control" @bind-Value="_updateModel.Description" />
+                        <ValidationMessage For="@(() => _updateModel.Description)" />
+                    </div>
+
+                    <button class="btn btn-primary" type="submit" disabled="@(!IsOwner || _isUpdating)">
+                        @(_isUpdating ? "Mentes..." : "Valtozasok mentese")
+                    </button>
+                </fieldset>
+            </EditForm>
+        </div>
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h5 mb-0">Tagkezeles</h2>
+                @if (!IsOwner)
+                {
+                    <span class="badge text-bg-secondary">Csak tulajdonos modosithat</span>
+                }
+            </div>
+
+            <EditForm Model="_memberModel" OnValidSubmit="HandleAddMemberAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <fieldset disabled="@(!IsOwner || _isAddingMember)">
+                    <div class="mb-3">
+                        <label class="form-label" for="memberId">Felhasznalo azonosito (GUID)</label>
+                        <InputText id="memberId" class="form-control" @bind-Value="_memberModel.MemberUserId" />
+                        <ValidationMessage For="@(() => _memberModel.MemberUserId)" />
+                    </div>
+
+                    <button class="btn btn-outline-primary" type="submit" disabled="@(!IsOwner || _isAddingMember)">
+                        @(_isAddingMember ? "Hozzaadas..." : "Tag hozzaadasa")
+                    </button>
+                </fieldset>
+            </EditForm>
+
+            <hr />
+
+            @if (_project.Members.Count == 0)
+            {
+                <p class="text-muted mb-0">Meg nincsenek tagok a projektben.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Teljes nev</th>
+                                <th>Email</th>
+                                <th>Csatlakozas</th>
+                                <th class="text-end">Muvelet</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var member in _project.Members.OrderBy(x => x.JoinedAt))
+                            {
+                                <tr>
+                                    <td>@member.FullName</td>
+                                    <td>@member.Email</td>
+                                    <td>@member.JoinedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                type="button"
+                                                disabled="@(!IsOwner || _isRemovingMember == member.UserId)"
+                                                @onclick="() => HandleRemoveMemberAsync(member.UserId)">
+                                            @(_isRemovingMember == member.UserId ? "Eltavolitas..." : "Eltavolitas")
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" type="button" @onclick="NavigateToList">
+            Vissza a listahoz
+        </button>
+        <button class="btn btn-outline-danger" type="button" disabled="@(!IsOwner || _isDeleting)" @onclick="HandleDeleteProjectAsync">
+            @(_isDeleting ? "Torles..." : "Projekt torlese")
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    private ProjectDetailsDto? _project;
+    private readonly UpdateProjectFormModel _updateModel = new();
+    private readonly AddMemberFormModel _memberModel = new();
+    private string? _errorMessage;
+    private string? _successMessage;
+    private bool _isLoading = true;
+    private bool _isUpdating;
+    private bool _isAddingMember;
+    private Guid? _isRemovingMember;
+    private bool _isDeleting;
+
+    private bool IsOwner => _project?.Owner.Id == AuthSessionStore.CurrentUser?.Id;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadProjectAsync();
+    }
+
+    private async Task LoadProjectAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _project = await ProjectsApiClient.GetProjectByIdAsync(ProjectId);
+            _updateModel.Name = _project.Name;
+            _updateModel.Description = _project.Description ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleUpdateAsync()
+    {
+        if (_project is null)
+        {
+            return;
+        }
+
+        _isUpdating = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            _project = await ProjectsApiClient.UpdateProjectAsync(_project.Id, new UpdateProjectRequestDto
+            {
+                Name = _updateModel.Name,
+                Description = string.IsNullOrWhiteSpace(_updateModel.Description) ? null : _updateModel.Description
+            });
+
+            _successMessage = "A projekt adatai frissultek.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
+
+    private async Task HandleAddMemberAsync()
+    {
+        if (_project is null)
+        {
+            return;
+        }
+
+        _isAddingMember = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            if (!Guid.TryParse(_memberModel.MemberUserId, out var memberUserId))
+            {
+                throw new InvalidOperationException("Ervenytelen GUID formatum.");
+            }
+
+            _project = await ProjectsApiClient.AddMemberAsync(_project.Id, new AddProjectMemberRequestDto
+            {
+                MemberUserId = memberUserId
+            });
+
+            _memberModel.MemberUserId = string.Empty;
+            _successMessage = "A tag sikeresen hozzaadva.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isAddingMember = false;
+        }
+    }
+
+    private async Task HandleRemoveMemberAsync(Guid memberUserId)
+    {
+        if (_project is null)
+        {
+            return;
+        }
+
+        _isRemovingMember = memberUserId;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            _project = await ProjectsApiClient.RemoveMemberAsync(_project.Id, memberUserId);
+            _successMessage = "A tag eltavolitva.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isRemovingMember = null;
+        }
+    }
+
+    private async Task HandleDeleteProjectAsync()
+    {
+        if (_project is null)
+        {
+            return;
+        }
+
+        _isDeleting = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            await ProjectsApiClient.DeleteProjectAsync(_project.Id);
+            NavigationManager.NavigateTo("/app/projects", forceLoad: false);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private void NavigateToList()
+    {
+        NavigationManager.NavigateTo("/app/projects", forceLoad: false);
+    }
+
+    private sealed class UpdateProjectFormModel
+    {
+        [Required(ErrorMessage = "A nev kotelezo.")]
+        [MinLength(3, ErrorMessage = "A nev legalabb 3 karakter legyen.")]
+        [MaxLength(100, ErrorMessage = "A nev legfeljebb 100 karakter lehet.")]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(1000, ErrorMessage = "A leiras legfeljebb 1000 karakter lehet.")]
+        public string? Description { get; set; }
+    }
+
+    private sealed class AddMemberFormModel
+    {
+        [Required(ErrorMessage = "A felhasznalo azonosito kotelezo.")]
+        public string MemberUserId { get; set; } = string.Empty;
+    }
+}
