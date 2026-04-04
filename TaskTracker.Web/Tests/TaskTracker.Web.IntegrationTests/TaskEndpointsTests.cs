@@ -95,6 +95,59 @@ public class TaskEndpointsTests : IClassFixture<TaskApiFactory>
     }
 
     [Fact]
+    public async Task Get_tasks_supports_due_date_range_and_sorting()
+    {
+        var client = _factory.CreateAuthenticatedClient(_factory.OwnerId);
+
+        var dueFrom = Uri.EscapeDataString(DateTime.UtcNow.AddDays(2).ToString("O"));
+        var dueTo = Uri.EscapeDataString(DateTime.UtcNow.AddDays(4).ToString("O"));
+
+        var response = await client.GetAsync(
+            $"projects/{_factory.ProjectId}/tasks?dueFrom={dueFrom}&dueTo={dueTo}&sortBy=dueDate&sortOrder=asc&page=1&limit=10");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<ApiResponse<PaginatedResultDto<TaskListItemDto>>>();
+        Assert.True(payload?.Success);
+        Assert.NotNull(payload?.Data);
+        Assert.Single(payload!.Data!.Items);
+        Assert.Equal(_factory.TaskOneId, payload.Data.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task Get_tasks_supports_combined_filters_and_created_at_sorting()
+    {
+        var client = _factory.CreateAuthenticatedClient(_factory.OwnerId);
+
+        var dueFrom = Uri.EscapeDataString(DateTime.UtcNow.AddDays(6).ToString("O"));
+        var dueTo = Uri.EscapeDataString(DateTime.UtcNow.AddDays(8).ToString("O"));
+
+        var response = await client.GetAsync(
+            $"projects/{_factory.ProjectId}/tasks?status=TODO&priority=MEDIUM&assigneeId={_factory.OwnerId}&dueFrom={dueFrom}&dueTo={dueTo}&sortBy=createdAt&sortOrder=desc&page=1&limit=10");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<ApiResponse<PaginatedResultDto<TaskListItemDto>>>();
+        Assert.True(payload?.Success);
+        Assert.NotNull(payload?.Data);
+        Assert.Single(payload!.Data!.Items);
+        Assert.Equal(_factory.TaskTwoId, payload.Data.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task Invalid_advanced_query_returns_bad_request()
+    {
+        var client = _factory.CreateAuthenticatedClient(_factory.OwnerId);
+
+        var response = await client.GetAsync($"projects/{_factory.ProjectId}/tasks?sortBy=invalidField&sortOrder=desc");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.NotNull(error);
+        Assert.False(error!.Success);
+    }
+
+    [Fact]
     public async Task Outsider_cannot_access_project_tasks()
     {
         var client = _factory.CreateAuthenticatedClient(_factory.OutsiderId);

@@ -130,9 +130,14 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.UpdatedAt);
 
             entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => new { e.ProjectId, e.CreatedAt });
+            entity.HasIndex(e => new { e.ProjectId, e.DueDate });
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.Priority);
             entity.HasIndex(e => e.AssignedUserId);
+            entity.HasIndex(e => new { e.ProjectId, e.Status });
+            entity.HasIndex(e => new { e.ProjectId, e.Priority });
+            entity.HasIndex(e => new { e.ProjectId, e.AssignedUserId });
 
             entity.HasOne(e => e.AssignedUser)
                 .WithMany(e => e.AssignedTasks)

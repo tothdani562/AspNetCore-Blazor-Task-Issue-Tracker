@@ -137,6 +137,18 @@ public class TasksApiClient : ITasksApiClient
         if (query.AssigneeId.HasValue)
             parameters.Add($"assigneeId={query.AssigneeId.Value}");
 
+        if (query.DueFrom.HasValue)
+            parameters.Add($"dueFrom={query.DueFrom.Value:o}");
+
+        if (query.DueTo.HasValue)
+            parameters.Add($"dueTo={query.DueTo.Value:o}");
+
+        if (query.SortBy.HasValue)
+            parameters.Add($"sortBy={query.SortBy.Value}");
+
+        if (query.SortOrder.HasValue)
+            parameters.Add($"sortOrder={query.SortOrder.Value}");
+
         if (query.Page > 0)
             parameters.Add($"page={query.Page}");
 
