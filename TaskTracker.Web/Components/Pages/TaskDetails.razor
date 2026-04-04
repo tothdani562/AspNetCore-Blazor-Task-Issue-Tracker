@@ -1,0 +1,338 @@
+@page "/app/projects/{ProjectId:guid}/tasks/{TaskId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using TaskTracker.Web.Dtos
+@using TaskTracker.Web.Dtos.Tasks
+@using TaskTracker.Web.Models
+@using TaskTracker.Web.Services.Tasks
+@using TaskTracker.Web.Services.Projects
+@using TaskTracker.Web.Services.Auth
+@inject ITasksApiClient TasksApiClient
+@inject IProjectsApiClient ProjectsApiClient
+@inject NavigationManager NavigationManager
+@inject IAuthSessionStore AuthSessionStore
+
+<PageTitle>Feladat részletei</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="alert alert-info" role="alert">Feladat betöltése...</div>
+}
+else if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_task is null)
+{
+    <div class="alert alert-warning" role="alert">A feladat nem található.</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="alert alert-success" role="alert">@_successMessage</div>
+    }
+
+    <h1>@_task.Title</h1>
+    <p class="text-muted mb-4">Projekt: @_project?.Name</p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <section class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Leírás</h2>
+                    @if (!string.IsNullOrWhiteSpace(_task.Description))
+                    {
+                        <p>@_task.Description</p>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Nincs leírás.</p>
+                    }
+                </div>
+            </section>
+
+            <section class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Szerkesztés</h2>
+
+                    <EditForm Model="_editModel" OnValidSubmit="HandleUpdateAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label class="form-label" for="taskTitle">Cím</label>
+                            <InputText id="taskTitle" class="form-control" @bind-Value="_editModel.Title" />
+                            <ValidationMessage For="@(() => _editModel.Title)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="taskDescription">Leírás</label>
+                            <InputTextArea id="taskDescription" class="form-control" @bind-Value="_editModel.Description" />
+                            <ValidationMessage For="@(() => _editModel.Description)" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="taskStatus">Státusz</label>
+                                <InputSelect id="taskStatus" class="form-select" @bind-Value="_editModel.Status">
+                                    <option value="@TaskItemStatus.TODO">Teendő</option>
+                                    <option value="@TaskItemStatus.IN_PROGRESS">Folyamatban</option>
+                                    <option value="@TaskItemStatus.DONE">Kész</option>
+                                </InputSelect>
+                                <ValidationMessage For="@(() => _editModel.Status)" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="taskPriority">Prioritás</label>
+                                <InputSelect id="taskPriority" class="form-select" @bind-Value="_editModel.Priority">
+                                    <option value="@TaskItemPriority.LOW">Alacsony</option>
+                                    <option value="@TaskItemPriority.MEDIUM">Közepes</option>
+                                    <option value="@TaskItemPriority.HIGH">Magas</option>
+                                </InputSelect>
+                                <ValidationMessage For="@(() => _editModel.Priority)" />
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="taskAssignee">Hozzárendelt felhasználó (GUID)</label>
+                                <InputText id="taskAssignee" class="form-control" @bind-Value="_assigneeIdString" />
+                                <small class="form-text text-muted">Hagyj üresen, ha senki sincs hozzárendelve</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="taskDueDate">Határidő</label>
+                                <InputDate id="taskDueDate" class="form-control" @bind-Value="_editModel.DueDate" />
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" type="submit" disabled="@_isUpdating">
+                            @(_isUpdating ? "Mentés..." : "Változások mentése")
+                        </button>
+                    </EditForm>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-md-4">
+            <section class="card">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Adatok</h2>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Státusz</small>
+                        <StatusBadge Status="_task.Status" />
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Prioritás</small>
+                        <PriorityBadge Priority="_task.Priority" />
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Hozzárendelt</small>
+                        @if (_task.AssignedUser is not null)
+                        {
+                            <p class="mb-0">@_task.AssignedUser.FullName</p>
+                            <small class="text-muted">@_task.AssignedUser.Email</small>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">Nincs hozzárendelve</p>
+                        }
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Határidő</small>
+                        @if (_task.DueDate.HasValue)
+                        {
+                            <p class="mb-0">@_task.DueDate.Value.ToLocalTime().ToString("yyyy-MM-dd")</p>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">--</p>
+                        }
+                    </div>
+
+                    <hr />
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Létrehozva</small>
+                        <small>@_task.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Utolsó módosítás</small>
+                        <small>@_task.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="mt-4 d-flex gap-2">
+        <a href="@($"/app/projects/{ProjectId}/tasks")" class="btn btn-outline-secondary">
+            Vissza a listához
+        </a>
+        <button class="btn @(_isConfirmingDelete ? "btn-outline-danger" : "btn-outline-warning")" type="button" 
+                disabled="@_isDeleting" @onclick="HandleDeleteTaskAsync">
+            @(_isConfirmingDelete ? "Biztosan? (Megerősítés)" : "Feladat törlése")
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    [Parameter]
+    public Guid TaskId { get; set; }
+
+    private TaskDetailsDto? _task;
+    private ProjectDetailsDto? _project;
+    private readonly EditTaskModel _editModel = new();
+    private string? _assigneeIdString;
+    private string? _errorMessage;
+    private string? _successMessage;
+    private bool _isLoading = true;
+    private bool _isUpdating;
+    private bool _isDeleting;
+    private bool _isConfirmingDelete;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadProjectAsync();
+        await LoadTaskAsync();
+    }
+
+    private async Task LoadProjectAsync()
+    {
+        try
+        {
+            _project = await ProjectsApiClient.GetProjectByIdAsync(ProjectId);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task LoadTaskAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            _task = await TasksApiClient.GetTaskByIdAsync(ProjectId, TaskId);
+            InitializeEditModel();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void InitializeEditModel()
+    {
+        if (_task is null) return;
+
+        _editModel.Title = _task.Title;
+        _editModel.Description = _task.Description ?? string.Empty;
+        _editModel.Status = _task.Status;
+        _editModel.Priority = _task.Priority;
+        _editModel.DueDate = _task.DueDate;
+        _assigneeIdString = _task.AssignedUserId?.ToString() ?? string.Empty;
+    }
+
+    private async Task HandleUpdateAsync()
+    {
+        _isUpdating = true;
+        _successMessage = null;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new UpdateTaskRequestDto
+            {
+                Title = _editModel.Title,
+                Description = _editModel.Description,
+                Status = _editModel.Status,
+                Priority = _editModel.Priority,
+                DueDate = _editModel.DueDate,
+                AssignedUserId = string.IsNullOrEmpty(_assigneeIdString)
+                    ? null
+                    : (Guid.TryParse(_assigneeIdString, out var guid) ? guid : null)
+            };
+
+            _task = await TasksApiClient.UpdateTaskAsync(ProjectId, TaskId, request);
+            _successMessage = "Feladat sikeresen frissítve.";
+            InitializeEditModel();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
+
+    private async Task HandleDeleteTaskAsync()
+    {
+        if (!_isConfirmingDelete)
+        {
+            // First click - mark for deletion to show confirmation
+            _isConfirmingDelete = true;
+        }
+        else
+        {
+            // Second click - confirmed, delete
+            _isDeleting = true;
+            _successMessage = null;
+            _errorMessage = null;
+
+            try
+            {
+                await TasksApiClient.DeleteTaskAsync(ProjectId, TaskId);
+                NavigationManager.NavigateTo($"/app/projects/{ProjectId}/tasks");
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = ex.Message;
+            }
+            finally
+            {
+                _isDeleting = false;
+                _isConfirmingDelete = false;
+            }
+        }
+    }
+
+    private class EditTaskModel
+    {
+        [Required]
+        [MinLength(3)]
+        [MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(2000)]
+        public string? Description { get; set; }
+
+        [Required]
+        public TaskItemStatus Status { get; set; } = TaskItemStatus.TODO;
+
+        [Required]
+        public TaskItemPriority Priority { get; set; } = TaskItemPriority.MEDIUM;
+
+        public DateTime? DueDate { get; set; }
+    }
+}

@@ -32,6 +32,10 @@ public class TaskService : ITaskService
         }
 
         var now = DateTime.UtcNow;
+        var dueDate = request.DueDate.HasValue
+            ? (DateTime?)DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc)
+            : (DateTime?)null;
+
         var task = new TaskItem
         {
             Id = Guid.NewGuid(),
@@ -40,7 +44,7 @@ public class TaskService : ITaskService
             Status = request.Status,
             Priority = request.Priority,
             AssignedUserId = request.AssignedUserId,
-            DueDate = request.DueDate,
+            DueDate = dueDate,
             ProjectId = projectId,
             CreatedAt = now,
             UpdatedAt = now
@@ -169,7 +173,7 @@ public class TaskService : ITaskService
 
         if (request.DueDate.HasValue)
         {
-            task.DueDate = request.DueDate;
+            task.DueDate = DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc);
             hasChange = true;
         }
 

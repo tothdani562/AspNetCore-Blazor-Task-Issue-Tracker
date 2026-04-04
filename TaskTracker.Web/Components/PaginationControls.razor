@@ -1,0 +1,44 @@
+@using TaskTracker.Web.Dtos
+@using TaskTracker.Web.Models
+
+<nav aria-label="Page navigation">
+    <ul class="pagination">
+        <li class="page-item @(CurrentPage <= 1 ? "disabled" : "")">
+            <button class="page-link" type="button" disabled="@(CurrentPage <= 1)" @onclick="() => OnPageChanged(CurrentPage - 1)">
+                Előző
+            </button>
+        </li>
+
+        @for (int i = 1; i <= TotalPages; i++)
+        {
+            var pageNum = i;
+            <li class="page-item @(CurrentPage == pageNum ? "active" : "")">
+                <button class="page-link" type="button" @onclick="() => OnPageChanged(pageNum)">
+                    @pageNum
+                </button>
+            </li>
+        }
+
+        <li class="page-item @(CurrentPage >= TotalPages ? "disabled" : "")">
+            <button class="page-link" type="button" disabled="@(CurrentPage >= TotalPages)" @onclick="() => OnPageChanged(CurrentPage + 1)">
+                Következő
+            </button>
+        </li>
+    </ul>
+</nav>
+
+@code {
+    [Parameter]
+    public int CurrentPage { get; set; } = 1;
+
+    [Parameter]
+    public int TotalPages { get; set; } = 1;
+
+    [Parameter]
+    public EventCallback<int> OnPageChange { get; set; }
+
+    private async Task OnPageChanged(int page)
+    {
+        await OnPageChange.InvokeAsync(page);
+    }
+}

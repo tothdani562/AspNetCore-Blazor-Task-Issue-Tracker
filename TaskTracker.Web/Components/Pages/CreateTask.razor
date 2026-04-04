@@ -1,0 +1,144 @@
+@page "/app/projects/{ProjectId:guid}/tasks/create"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using TaskTracker.Web.Dtos.Tasks
+@using TaskTracker.Web.Models
+@using TaskTracker.Web.Services.Tasks
+@using TaskTracker.Web.Services.Projects
+@inject ITasksApiClient TasksApiClient
+@inject IProjectsApiClient ProjectsApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Új feladat</PageTitle>
+
+<div class="row">
+    <div class="col-md-8">
+        <h1>Új feladat</h1>
+        @if (_project is not null)
+        {
+            <p class="text-muted mb-4">Projekt: @_project.Name</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">@_errorMessage</div>
+        }
+
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="_createModel" OnValidSubmit="HandleCreateAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label class="form-label" for="title">Cím</label>
+                        <InputText id="title" class="form-control" @bind-Value="_createModel.Title" />
+                        <ValidationMessage For="@(() => _createModel.Title)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="description">Leírás</label>
+                        <InputTextArea id="description" class="form-control" @bind-Value="_createModel.Description" />
+                        <ValidationMessage For="@(() => _createModel.Description)" />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="status">Státusz</label>
+                            <InputSelect id="status" class="form-select" @bind-Value="_createModel.Status">
+                                <option value="@TaskItemStatus.TODO">Teendő</option>
+                                <option value="@TaskItemStatus.IN_PROGRESS">Folyamatban</option>
+                                <option value="@TaskItemStatus.DONE">Kész</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => _createModel.Status)" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="priority">Prioritás</label>
+                            <InputSelect id="priority" class="form-select" @bind-Value="_createModel.Priority">
+                                <option value="@TaskItemPriority.LOW">Alacsony</option>
+                                <option value="@TaskItemPriority.MEDIUM">Közepes</option>
+                                <option value="@TaskItemPriority.HIGH">Magas</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => _createModel.Priority)" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="assignee">Hozzárendelt felhasználó (GUID)</label>
+                            <InputText id="assignee" class="form-control" @bind-Value="_assigneeIdString" />
+                            <small class="form-text text-muted">Hagyj üresen, ha senki sincs hozzárendelve</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="dueDate">Határidő</label>
+                            <InputDate id="dueDate" class="form-control" @bind-Value="_createModel.DueDate" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" type="submit" disabled="@_isCreating">
+                            @(_isCreating ? "Létrehozás..." : "Feladat létrehozása")
+                        </button>
+                        <a href="@($"/app/projects/{ProjectId}/tasks")" class="btn btn-outline-secondary">
+                            Mégse
+                        </a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    private ProjectDetailsDto? _project;
+    private readonly CreateTaskRequestDto _createModel = new();
+    private string? _assigneeIdString;
+    private string? _errorMessage;
+    private bool _isCreating;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadProjectAsync();
+    }
+
+    private async Task LoadProjectAsync()
+    {
+        try
+        {
+            _project = await ProjectsApiClient.GetProjectByIdAsync(ProjectId);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task HandleCreateAsync()
+    {
+        _isCreating = true;
+        _errorMessage = null;
+
+        try
+        {
+            _createModel.AssignedUserId = string.IsNullOrEmpty(_assigneeIdString)
+                ? null
+                : (Guid.TryParse(_assigneeIdString, out var guid) ? guid : null);
+
+            var result = await TasksApiClient.CreateTaskAsync(ProjectId, _createModel);
+            NavigationManager.NavigateTo($"/app/projects/{ProjectId}/tasks/{result.Id}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+}
