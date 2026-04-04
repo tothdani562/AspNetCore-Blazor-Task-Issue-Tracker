@@ -1,0 +1,19 @@
+@using TaskTracker.Web.Models
+
+@if (Status == TaskItemStatus.TODO)
+{
+    <span class="badge text-bg-secondary">Teendő</span>
+}
+else if (Status == TaskItemStatus.IN_PROGRESS)
+{
+    <span class="badge text-bg-info">Folyamatban</span>
+}
+else if (Status == TaskItemStatus.DONE)
+{
+    <span class="badge text-bg-success">Kész</span>
+}
+
+@code {
+    [Parameter]
+    public TaskItemStatus Status { get; set; }
+}

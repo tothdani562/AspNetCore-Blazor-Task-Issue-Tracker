@@ -11,7 +11,7 @@ public class TaskItem
     public User? AssignedUser { get; set; }
     public DateTime? DueDate { get; set; }
     public Guid ProjectId { get; set; }
-    public Project Project { get; set; } = null!;
+    public Project? Project { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

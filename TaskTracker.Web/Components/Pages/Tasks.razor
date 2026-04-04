@@ -1,0 +1,223 @@
+@page "/app/projects/{ProjectId:guid}/tasks"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using TaskTracker.Web.Dtos
+@using TaskTracker.Web.Dtos.Tasks
+@using TaskTracker.Web.Services.Tasks
+@using TaskTracker.Web.Services.Projects
+@using TaskTracker.Web.Services.Auth
+@inject ITasksApiClient TasksApiClient
+@inject IProjectsApiClient ProjectsApiClient
+@inject NavigationManager NavigationManager
+@inject IAuthSessionStore AuthSessionStore
+
+<PageTitle>Task lista</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>Feladatok</h1>
+        @if (_project is not null)
+        {
+            <p class="text-muted">Projekt: @_project.Name</p>
+        }
+    </div>
+    <button class="btn btn-primary" type="button" @onclick="NavigateToCreate">
+        Új feladat
+    </button>
+</div>
+
+@if (_isLoading)
+{
+    <div class="alert alert-info" role="alert">Feladatok betöltése...</div>
+}
+else if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="alert alert-success" role="alert">@_successMessage</div>
+    }
+
+    <TaskFilters CurrentQuery="_currentQuery" OnFilterChange="HandleFilterChange" />
+
+    @if (_tasks is null || _tasks.Items.Count == 0)
+    {
+        <div class="alert alert-info" role="alert">Nincsenek feladatok a projektben.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Cím</th>
+                        <th>Státusz</th>
+                        <th>Prioritás</th>
+                        <th>Határidő</th>
+                        <th>Hozzárendelt</th>
+                        <th class="text-end">Műveletek</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var task in _tasks.Items)
+                    {
+                        <tr>
+                            <td>
+                                <a href="@($"/app/projects/{ProjectId}/tasks/{task.Id}")" class="text-decoration-none">
+                                    @task.Title
+                                </a>
+                            </td>
+                            <td>
+                                <StatusBadge Status="task.Status" />
+                            </td>
+                            <td>
+                                <PriorityBadge Priority="task.Priority" />
+                            </td>
+                            <td>
+                                @if (task.DueDate.HasValue)
+                                {
+                                    <span>@task.DueDate.Value.ToLocalTime().ToString("yyyy-MM-dd")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">--</span>
+                                }
+                            </td>
+                            <td>
+                                @if (task.AssignedUser is not null)
+                                {
+                                    <small>@task.AssignedUser.FullName</small>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Nincs hozzárendelve</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a href="@($"/app/projects/{ProjectId}/tasks/{task.Id}/edit")" class="btn btn-sm btn-outline-secondary">
+                                    Szerkesztés
+                                </a>
+                                <button class="btn btn-sm @(_isDeletingTaskId == task.Id ? "btn-outline-danger" : "btn-outline-warning")" type="button"
+                                        @onclick="() => HandleDeleteTaskAsync(task.Id)">
+                                    @(_isDeletingTaskId == task.Id ? "Biztosan? (Megerősítés)" : "Törlés")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (_tasks.TotalPages > 1)
+        {
+            <PaginationControls CurrentPage="_currentQuery.Page" TotalPages="_tasks.TotalPages" OnPageChange="HandlePageChange" />
+        }
+    }
+}
+
+<div class="mt-4">
+    <button class="btn btn-outline-secondary" type="button" @onclick="NavigateToProject">
+        Vissza a projekthez
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    private ProjectDetailsDto? _project;
+    private PaginatedResultDto<TaskListItemDto>? _tasks;
+    private GetTasksQueryDto _currentQuery = new();
+    private string? _errorMessage;
+    private string? _successMessage;
+    private bool _isLoading = true;
+    private Guid? _isDeletingTaskId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadProjectAsync();
+        await LoadTasksAsync();
+    }
+
+    private async Task LoadProjectAsync()
+    {
+        try
+        {
+            _project = await ProjectsApiClient.GetProjectByIdAsync(ProjectId);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task LoadTasksAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            _tasks = await TasksApiClient.GetTasksAsync(ProjectId, _currentQuery);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleFilterChange(GetTasksQueryDto query)
+    {
+        _currentQuery = query;
+        await LoadTasksAsync();
+    }
+
+    private async Task HandlePageChange(int page)
+    {
+        _currentQuery.Page = page;
+        await LoadTasksAsync();
+    }
+
+    private async Task HandleDeleteTaskAsync(Guid taskId)
+    {
+        if (_isDeletingTaskId == taskId)
+        {
+            // Already confirmed, now delete
+            _isDeletingTaskId = null;
+
+            try
+            {
+                await TasksApiClient.DeleteTaskAsync(ProjectId, taskId);
+                _successMessage = "Feladat sikeresen törölve.";
+                await LoadTasksAsync();
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = ex.Message;
+            }
+        }
+        else
+        {
+            // First click - mark for deletion to show confirmation
+            _isDeletingTaskId = taskId;
+        }
+    }
+
+    private void NavigateToCreate()
+    {
+        NavigationManager.NavigateTo($"/app/projects/{ProjectId}/tasks/create");
+    }
+
+    private void NavigateToProject()
+    {
+        NavigationManager.NavigateTo($"/app/projects/{ProjectId}");
+    }
+}

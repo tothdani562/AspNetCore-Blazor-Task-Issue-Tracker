@@ -1,0 +1,104 @@
+@using TaskTracker.Web.Models
+@using TaskTracker.Web.Dtos.Tasks
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Szűrők</h5>
+
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Státusz</label>
+                <select class="form-select" @onchange="(ChangeEventArgs e) => OnStatusChanged((string?)e.Value)">
+                    <option value="">-- Összes státusz --</option>
+                    <option value="@TaskItemStatus.TODO">Teendő</option>
+                    <option value="@TaskItemStatus.IN_PROGRESS">Folyamatban</option>
+                    <option value="@TaskItemStatus.DONE">Kész</option>
+                </select>
+            </div>
+
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Prioritás</label>
+                <select class="form-select" @onchange="(ChangeEventArgs e) => OnPriorityChanged((string?)e.Value)">
+                    <option value="">-- Összes prioritás --</option>
+                    <option value="@TaskItemPriority.LOW">Alacsony</option>
+                    <option value="@TaskItemPriority.MEDIUM">Közepes</option>
+                    <option value="@TaskItemPriority.HIGH">Magas</option>
+                </select>
+            </div>
+
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Hozzárendelt felhasználó</label>
+                <input type="text" class="form-control" placeholder="GUID" 
+                       value="@(SelectedAssigneeId?.ToString() ?? "")"
+                       @onchange="(ChangeEventArgs e) => OnAssigneeChanged((string?)e.Value)" />
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="OnReset">
+                Szűrők törlése
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public GetTasksQueryDto CurrentQuery { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<GetTasksQueryDto> OnFilterChange { get; set; }
+
+    private Guid? SelectedAssigneeId => CurrentQuery.AssigneeId;
+
+    private async Task OnStatusChanged(string? value)
+    {
+        var query = new GetTasksQueryDto
+        {
+            Status = string.IsNullOrEmpty(value) ? null : Enum.Parse<TaskItemStatus>(value),
+            Priority = CurrentQuery.Priority,
+            AssigneeId = CurrentQuery.AssigneeId,
+            Page = 1,
+            Limit = CurrentQuery.Limit
+        };
+        await OnFilterChange.InvokeAsync(query);
+    }
+
+    private async Task OnPriorityChanged(string? value)
+    {
+        var query = new GetTasksQueryDto
+        {
+            Status = CurrentQuery.Status,
+            Priority = string.IsNullOrEmpty(value) ? null : Enum.Parse<TaskItemPriority>(value),
+            AssigneeId = CurrentQuery.AssigneeId,
+            Page = 1,
+            Limit = CurrentQuery.Limit
+        };
+        await OnFilterChange.InvokeAsync(query);
+    }
+
+    private async Task OnAssigneeChanged(string? value)
+    {
+        Guid? assigneeId = null;
+        if (!string.IsNullOrEmpty(value) && Guid.TryParse(value, out var guid))
+        {
+            assigneeId = guid;
+        }
+
+        var query = new GetTasksQueryDto
+        {
+            Status = CurrentQuery.Status,
+            Priority = CurrentQuery.Priority,
+            AssigneeId = assigneeId,
+            Page = 1,
+            Limit = CurrentQuery.Limit
+        };
+        await OnFilterChange.InvokeAsync(query);
+    }
+
+    private async Task OnReset()
+    {
+        var query = new GetTasksQueryDto { Page = 1, Limit = 20 };
+        await OnFilterChange.InvokeAsync(query);
+    }
+}

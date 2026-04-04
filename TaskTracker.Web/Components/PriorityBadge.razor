@@ -1,0 +1,19 @@
+@using TaskTracker.Web.Models
+
+@if (Priority == TaskItemPriority.LOW)
+{
+    <span class="badge text-bg-secondary">Alacsony</span>
+}
+else if (Priority == TaskItemPriority.MEDIUM)
+{
+    <span class="badge text-bg-warning">Közepes</span>
+}
+else if (Priority == TaskItemPriority.HIGH)
+{
+    <span class="badge text-bg-danger">Magas</span>
+}
+
+@code {
+    [Parameter]
+    public TaskItemPriority Priority { get; set; }
+}
