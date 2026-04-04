@@ -1,0 +1,93 @@
+@using TaskTracker.Web.Dtos.Tasks
+@using TaskTracker.Web.Models
+
+<div class="table-responsive">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th scope="col">Feladat</th>
+                <th scope="col">Státusz</th>
+                <th scope="col">Prioritás</th>
+                <th scope="col">Határidő</th>
+                <th scope="col">Hozzárendelt</th>
+                <th scope="col" class="text-end">Műveletek</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var task in Tasks)
+            {
+                <tr>
+                    <td>
+                        <a href="@($"/app/projects/{ProjectId}/tasks/{task.Id}")" class="text-decoration-none fw-semibold">
+                            @task.Title
+                        </a>
+                        @if (!string.IsNullOrWhiteSpace(task.Description))
+                        {
+                            <div class="text-muted small mt-1">@task.Description</div>
+                        }
+                    </td>
+                    <td>
+                        <StatusBadge Status="task.Status" />
+                    </td>
+                    <td>
+                        <PriorityBadge Priority="task.Priority" />
+                    </td>
+                    <td>
+                        @if (task.DueDate.HasValue)
+                        {
+                            <span>@task.DueDate.Value.ToString("yyyy-MM-dd")</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">--</span>
+                        }
+                    </td>
+                    <td>
+                        @if (task.AssignedUser is not null)
+                        {
+                            <small>@task.AssignedUser.FullName</small>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">Nincs hozzárendelve</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Task actions">
+                            <a href="@($"/app/projects/{ProjectId}/tasks/{task.Id}/edit")" class="btn btn-outline-secondary">
+                                Szerkesztés
+                            </a>
+                            <button class="btn @GetDeleteButtonClass(task.Id)" type="button" @onclick="() => OnDeleteRequested.InvokeAsync(task.Id)">
+                                @GetDeleteButtonText(task.Id)
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<TaskListItemDto> Tasks { get; set; } = Array.Empty<TaskListItemDto>();
+
+    [Parameter]
+    public Guid? DeletingTaskId { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnDeleteRequested { get; set; }
+
+    private string GetDeleteButtonClass(Guid taskId)
+    {
+        return DeletingTaskId == taskId ? "btn-outline-danger" : "btn-outline-warning";
+    }
+
+    private string GetDeleteButtonText(Guid taskId)
+    {
+        return DeletingTaskId == taskId ? "Biztosan? (Megerősítés)" : "Törlés";
+    }
+}

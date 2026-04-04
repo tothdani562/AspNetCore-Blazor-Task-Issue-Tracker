@@ -1,14 +1,23 @@
-@using TaskTracker.Web.Models
+@using System.Globalization
 @using TaskTracker.Web.Dtos.Tasks
+@using TaskTracker.Web.Models
 
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title mb-3">Szűrők</h5>
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+            <div>
+                <h2 class="h5 mb-1">Szűrők és rendezés</h2>
+                <p class="text-muted mb-0">A választások automatikusan frissítik a lista nézetét.</p>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="OnReset" disabled="@(!HasActiveFilters)">
+                Szűrők törlése
+            </button>
+        </div>
 
-        <div class="row">
-            <div class="col-md-4 mb-3">
+        <div class="row g-3">
+            <div class="col-md-4">
                 <label class="form-label">Státusz</label>
-                <select class="form-select" @onchange="(ChangeEventArgs e) => OnStatusChanged((string?)e.Value)">
+                <select class="form-select" value="@SelectedStatusValue" @onchange="OnStatusChanged">
                     <option value="">-- Összes státusz --</option>
                     <option value="@TaskItemStatus.TODO">Teendő</option>
                     <option value="@TaskItemStatus.IN_PROGRESS">Folyamatban</option>
@@ -16,9 +25,9 @@
                 </select>
             </div>
 
-            <div class="col-md-4 mb-3">
+            <div class="col-md-4">
                 <label class="form-label">Prioritás</label>
-                <select class="form-select" @onchange="(ChangeEventArgs e) => OnPriorityChanged((string?)e.Value)">
+                <select class="form-select" value="@SelectedPriorityValue" @onchange="OnPriorityChanged">
                     <option value="">-- Összes prioritás --</option>
                     <option value="@TaskItemPriority.LOW">Alacsony</option>
                     <option value="@TaskItemPriority.MEDIUM">Közepes</option>
@@ -26,18 +35,42 @@
                 </select>
             </div>
 
-            <div class="col-md-4 mb-3">
+            <div class="col-md-4">
                 <label class="form-label">Hozzárendelt felhasználó</label>
-                <input type="text" class="form-control" placeholder="GUID" 
-                       value="@(SelectedAssigneeId?.ToString() ?? "")"
-                       @onchange="(ChangeEventArgs e) => OnAssigneeChanged((string?)e.Value)" />
+                <input type="text" class="form-control" placeholder="GUID"
+                       value="@(CurrentQuery.AssigneeId?.ToString() ?? string.Empty)"
+                       @onchange="OnAssigneeChanged" />
             </div>
-        </div>
 
-        <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="OnReset">
-                Szűrők törlése
-            </button>
+            <div class="col-md-6">
+                <label class="form-label">Határidő ettől</label>
+                <input type="date" class="form-control" value="@SelectedDueFromValue" @onchange="OnDueFromChanged" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Határidő eddig</label>
+                <input type="date" class="form-control" value="@SelectedDueToValue" @onchange="OnDueToChanged" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Rendezés mező</label>
+                <select class="form-select" value="@SelectedSortByValue" @onchange="OnSortByChanged">
+                    <option value="">-- Legutóbbi módosítás (alapértelmezett) --</option>
+                    <option value="@TaskSortBy.CreatedAt">Létrehozás dátuma</option>
+                    <option value="@TaskSortBy.DueDate">Határidő</option>
+                    <option value="@TaskSortBy.Priority">Prioritás</option>
+                    <option value="@TaskSortBy.Status">Státusz</option>
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Rendezés iránya</label>
+                <select class="form-select" value="@SelectedSortOrderValue" @onchange="OnSortOrderChanged" disabled="@(!CurrentQuery.SortBy.HasValue)">
+                    <option value="">-- Csökkenő (alapértelmezett) --</option>
+                    <option value="@TaskSortOrder.Asc">Növekvő</option>
+                    <option value="@TaskSortOrder.Desc">Csökkenő</option>
+                </select>
+            </div>
         </div>
     </div>
 </div>
@@ -49,56 +82,187 @@
     [Parameter]
     public EventCallback<GetTasksQueryDto> OnFilterChange { get; set; }
 
-    private Guid? SelectedAssigneeId => CurrentQuery.AssigneeId;
+    private bool HasActiveFilters =>
+        CurrentQuery.Status.HasValue ||
+        CurrentQuery.Priority.HasValue ||
+        CurrentQuery.AssigneeId.HasValue ||
+        CurrentQuery.DueFrom.HasValue ||
+        CurrentQuery.DueTo.HasValue ||
+        CurrentQuery.SortBy.HasValue ||
+        CurrentQuery.SortOrder.HasValue;
 
-    private async Task OnStatusChanged(string? value)
+    private string SelectedStatusValue => CurrentQuery.Status?.ToString() ?? string.Empty;
+
+    private string SelectedPriorityValue => CurrentQuery.Priority?.ToString() ?? string.Empty;
+
+    private string SelectedDueFromValue => FormatDateValue(CurrentQuery.DueFrom);
+
+    private string SelectedDueToValue => FormatDateValue(CurrentQuery.DueTo);
+
+    private string SelectedSortByValue => CurrentQuery.SortBy?.ToString() ?? string.Empty;
+
+    private string SelectedSortOrderValue => CurrentQuery.SortOrder?.ToString() ?? string.Empty;
+
+    private async Task OnStatusChanged(ChangeEventArgs e)
     {
-        var query = new GetTasksQueryDto
-        {
-            Status = string.IsNullOrEmpty(value) ? null : Enum.Parse<TaskItemStatus>(value),
-            Priority = CurrentQuery.Priority,
-            AssigneeId = CurrentQuery.AssigneeId,
-            Page = 1,
-            Limit = CurrentQuery.Limit
-        };
+        var query = CloneQuery();
+        query.Status = ParseEnum<TaskItemStatus>(e.Value);
+        query.Page = 1;
         await OnFilterChange.InvokeAsync(query);
     }
 
-    private async Task OnPriorityChanged(string? value)
+    private async Task OnPriorityChanged(ChangeEventArgs e)
     {
-        var query = new GetTasksQueryDto
-        {
-            Status = CurrentQuery.Status,
-            Priority = string.IsNullOrEmpty(value) ? null : Enum.Parse<TaskItemPriority>(value),
-            AssigneeId = CurrentQuery.AssigneeId,
-            Page = 1,
-            Limit = CurrentQuery.Limit
-        };
+        var query = CloneQuery();
+        query.Priority = ParseEnum<TaskItemPriority>(e.Value);
+        query.Page = 1;
         await OnFilterChange.InvokeAsync(query);
     }
 
-    private async Task OnAssigneeChanged(string? value)
+    private async Task OnAssigneeChanged(ChangeEventArgs e)
     {
-        Guid? assigneeId = null;
-        if (!string.IsNullOrEmpty(value) && Guid.TryParse(value, out var guid))
+        var query = CloneQuery();
+        query.AssigneeId = ParseGuid(e.Value);
+        query.Page = 1;
+        await OnFilterChange.InvokeAsync(query);
+    }
+
+    private async Task OnDueFromChanged(ChangeEventArgs e)
+    {
+        var query = CloneQuery();
+        query.DueFrom = ParseDateStart(e.Value);
+        if (query.DueFrom.HasValue && query.DueTo.HasValue && query.DueFrom.Value > query.DueTo.Value)
         {
-            assigneeId = guid;
+            query.DueTo = query.DueFrom;
         }
 
-        var query = new GetTasksQueryDto
+        query.Page = 1;
+        await OnFilterChange.InvokeAsync(query);
+    }
+
+    private async Task OnDueToChanged(ChangeEventArgs e)
+    {
+        var query = CloneQuery();
+        query.DueTo = ParseDateEnd(e.Value);
+        if (query.DueFrom.HasValue && query.DueTo.HasValue && query.DueTo.Value < query.DueFrom.Value)
         {
-            Status = CurrentQuery.Status,
-            Priority = CurrentQuery.Priority,
-            AssigneeId = assigneeId,
-            Page = 1,
-            Limit = CurrentQuery.Limit
-        };
+            query.DueFrom = query.DueTo;
+        }
+
+        query.Page = 1;
+        await OnFilterChange.InvokeAsync(query);
+    }
+
+    private async Task OnSortByChanged(ChangeEventArgs e)
+    {
+        var query = CloneQuery();
+        query.SortBy = ParseEnum<TaskSortBy>(e.Value);
+        query.SortOrder = query.SortBy.HasValue
+            ? (query.SortOrder ?? TaskSortOrder.Desc)
+            : null;
+        query.Page = 1;
+        await OnFilterChange.InvokeAsync(query);
+    }
+
+    private async Task OnSortOrderChanged(ChangeEventArgs e)
+    {
+        var query = CloneQuery();
+        query.SortOrder = query.SortBy.HasValue
+            ? ParseEnum<TaskSortOrder>(e.Value)
+            : null;
+        query.Page = 1;
         await OnFilterChange.InvokeAsync(query);
     }
 
     private async Task OnReset()
     {
-        var query = new GetTasksQueryDto { Page = 1, Limit = 20 };
+        var query = new GetTasksQueryDto
+        {
+            Page = 1,
+            Limit = CurrentQuery.Limit
+        };
+
         await OnFilterChange.InvokeAsync(query);
+    }
+
+    private GetTasksQueryDto CloneQuery()
+    {
+        return new GetTasksQueryDto
+        {
+            Status = CurrentQuery.Status,
+            Priority = CurrentQuery.Priority,
+            AssigneeId = CurrentQuery.AssigneeId,
+            DueFrom = CurrentQuery.DueFrom,
+            DueTo = CurrentQuery.DueTo,
+            SortBy = CurrentQuery.SortBy,
+            SortOrder = CurrentQuery.SortOrder,
+            Page = CurrentQuery.Page,
+            Limit = CurrentQuery.Limit
+        };
+    }
+
+    private static string FormatDateValue(DateTime? value)
+    {
+        return value.HasValue
+            ? value.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : string.Empty;
+    }
+
+    private static TEnum? ParseEnum<TEnum>(object? value)
+        where TEnum : struct, Enum
+    {
+        var text = value?.ToString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return Enum.TryParse<TEnum>(text, true, out var parsed) ? parsed : null;
+    }
+
+    private static Guid? ParseGuid(object? value)
+    {
+        var text = value?.ToString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return Guid.TryParse(text, out var parsed) ? parsed : null;
+    }
+
+    private static DateTime? ParseDateStart(object? value)
+    {
+        var date = ParseDateOnly(value);
+        if (date is null)
+        {
+            return null;
+        }
+
+        return DateTime.SpecifyKind(date.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+    }
+
+    private static DateTime? ParseDateEnd(object? value)
+    {
+        var date = ParseDateOnly(value);
+        if (date is null)
+        {
+            return null;
+        }
+
+        return DateTime.SpecifyKind(date.Value.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+    }
+
+    private static DateOnly? ParseDateOnly(object? value)
+    {
+        var text = value?.ToString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return DateOnly.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? parsed
+            : null;
     }
 }
