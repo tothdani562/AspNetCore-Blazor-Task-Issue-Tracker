@@ -85,6 +85,7 @@ builder.Services.AddScoped<IAuthTokenStorage, BrowserAuthTokenStorage>();
 builder.Services.AddScoped<IAuthApiClient, AuthApiClient>();
 builder.Services.AddScoped<IProjectsApiClient, ProjectsApiClient>();
 builder.Services.AddScoped<ITasksApiClient, TasksApiClient>();
+builder.Services.AddScoped<ICommentsApiClient, CommentsApiClient>();
 builder.Services.AddScoped<AuthFacade>();
 builder.Services.AddScoped<AppAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(
