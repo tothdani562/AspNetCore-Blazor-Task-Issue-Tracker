@@ -12,6 +12,7 @@ public class TaskItem
     public DateTime? DueDate { get; set; }
     public Guid ProjectId { get; set; }
     public Project? Project { get; set; }
+    public ICollection<Comment> Comments { get; set; } = new List<Comment>();
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
