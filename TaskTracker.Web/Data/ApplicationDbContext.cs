@@ -13,6 +13,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Project> Projects { get; set; }
     public DbSet<ProjectMember> ProjectMembers { get; set; }
     public DbSet<TaskItem> Tasks { get; set; }
+    public DbSet<Comment> Comments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -143,6 +144,39 @@ public class ApplicationDbContext : DbContext
                 .WithMany(e => e.AssignedTasks)
                 .HasForeignKey(e => e.AssignedUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(e => e.Comments)
+                .WithOne(e => e.Task)
+                .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Comment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.TaskId)
+                .IsRequired();
+
+            entity.Property(e => e.AuthorId)
+                .IsRequired();
+
+            entity.Property(e => e.Content)
+                .IsRequired()
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.CreatedAt);
+
+            entity.Property(e => e.UpdatedAt);
+
+            entity.HasIndex(e => e.TaskId);
+            entity.HasIndex(e => e.AuthorId);
+            entity.HasIndex(e => new { e.TaskId, e.CreatedAt });
+
+            entity.HasOne(e => e.Author)
+                .WithMany(e => e.AuthoredComments)
+                .HasForeignKey(e => e.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

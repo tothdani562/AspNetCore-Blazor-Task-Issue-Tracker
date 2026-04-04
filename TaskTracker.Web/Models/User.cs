@@ -9,6 +9,7 @@ public class User
     public string? RefreshTokenHash { get; set; }
     public DateTime? RefreshTokenExpiresAt { get; set; }
     public ICollection<TaskItem> AssignedTasks { get; set; } = new List<TaskItem>();
+    public ICollection<Comment> AuthoredComments { get; set; } = new List<Comment>();
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
