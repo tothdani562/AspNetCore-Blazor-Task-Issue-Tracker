@@ -85,13 +85,24 @@ public class TaskService : ITaskService
             tasksQuery = tasksQuery.Where(task => task.AssignedUserId == query.AssigneeId.Value);
         }
 
+        if (query.DueFrom.HasValue)
+        {
+            tasksQuery = tasksQuery.Where(task => task.DueDate.HasValue && task.DueDate.Value >= query.DueFrom.Value);
+        }
+
+        if (query.DueTo.HasValue)
+        {
+            tasksQuery = tasksQuery.Where(task => task.DueDate.HasValue && task.DueDate.Value <= query.DueTo.Value);
+        }
+
+        tasksQuery = ApplySorting(tasksQuery, query);
+
         var totalCount = await tasksQuery.CountAsync(cancellationToken);
         var totalPages = totalCount == 0
             ? 0
             : (int)Math.Ceiling(totalCount / (double)query.Limit);
 
         var items = await tasksQuery
-            .OrderByDescending(task => task.UpdatedAt)
             .Skip((query.Page - 1) * query.Limit)
             .Take(query.Limit)
             .ToListAsync(cancellationToken);
@@ -331,5 +342,51 @@ public class TaskService : ITaskService
         }
 
         return description.Trim();
+    }
+
+    private static IQueryable<TaskItem> ApplySorting(IQueryable<TaskItem> query, GetTasksQueryDto filter)
+    {
+        if (!filter.SortBy.HasValue)
+        {
+            return query
+                .OrderByDescending(task => task.UpdatedAt)
+                .ThenByDescending(task => task.CreatedAt)
+                .ThenByDescending(task => task.Id);
+        }
+
+        var descending = filter.SortOrder != TaskSortOrder.Asc;
+
+        return filter.SortBy.Value switch
+        {
+            TaskSortBy.CreatedAt => descending
+                ? query.OrderByDescending(task => task.CreatedAt).ThenByDescending(task => task.Id)
+                : query.OrderBy(task => task.CreatedAt).ThenBy(task => task.Id),
+            TaskSortBy.DueDate => descending
+                ? query.OrderBy(task => task.DueDate == null)
+                    .ThenByDescending(task => task.DueDate)
+                    .ThenByDescending(task => task.CreatedAt)
+                    .ThenByDescending(task => task.Id)
+                : query.OrderBy(task => task.DueDate == null)
+                    .ThenBy(task => task.DueDate)
+                    .ThenBy(task => task.CreatedAt)
+                    .ThenBy(task => task.Id),
+            TaskSortBy.Priority => descending
+                ? query.OrderByDescending(task => task.Priority == TaskItemPriority.LOW ? 0 : task.Priority == TaskItemPriority.MEDIUM ? 1 : 2)
+                    .ThenByDescending(task => task.CreatedAt)
+                    .ThenByDescending(task => task.Id)
+                : query.OrderBy(task => task.Priority == TaskItemPriority.LOW ? 0 : task.Priority == TaskItemPriority.MEDIUM ? 1 : 2)
+                    .ThenBy(task => task.CreatedAt)
+                    .ThenBy(task => task.Id),
+            TaskSortBy.Status => descending
+                ? query.OrderByDescending(task => task.Status == TaskItemStatus.TODO ? 0 : task.Status == TaskItemStatus.IN_PROGRESS ? 1 : 2)
+                    .ThenByDescending(task => task.CreatedAt)
+                    .ThenByDescending(task => task.Id)
+                : query.OrderBy(task => task.Status == TaskItemStatus.TODO ? 0 : task.Status == TaskItemStatus.IN_PROGRESS ? 1 : 2)
+                    .ThenBy(task => task.CreatedAt)
+                    .ThenBy(task => task.Id),
+            _ => query.OrderByDescending(task => task.UpdatedAt)
+                .ThenByDescending(task => task.CreatedAt)
+                .ThenByDescending(task => task.Id)
+        };
     }
 }
