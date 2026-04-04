@@ -3,12 +3,15 @@
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using TaskTracker.Web.Dtos
+@using TaskTracker.Web.Dtos.Comments
 @using TaskTracker.Web.Dtos.Tasks
 @using TaskTracker.Web.Models
+@using TaskTracker.Web.Services.Comments
 @using TaskTracker.Web.Services.Tasks
 @using TaskTracker.Web.Services.Projects
 @using TaskTracker.Web.Services.Auth
 @inject ITasksApiClient TasksApiClient
+@inject ICommentsApiClient CommentsApiClient
 @inject IProjectsApiClient ProjectsApiClient
 @inject NavigationManager NavigationManager
 @inject IAuthSessionStore AuthSessionStore
@@ -114,6 +117,116 @@ else
                     </EditForm>
                 </div>
             </section>
+
+            <section class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Kommentek</h2>
+
+                    @if (!string.IsNullOrWhiteSpace(_commentsSuccessMessage))
+                    {
+                        <div class="alert alert-success" role="alert">@_commentsSuccessMessage</div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_commentsErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">@_commentsErrorMessage</div>
+                    }
+
+                    <EditForm Model="_newCommentModel" OnValidSubmit="HandleCreateCommentAsync" class="mb-4">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-2">
+                            <label class="form-label" for="newCommentContent">Új komment</label>
+                            <InputTextArea id="newCommentContent" class="form-control" @bind-Value="_newCommentModel.Content" rows="3" />
+                            <ValidationMessage For="@(() => _newCommentModel.Content)" />
+                        </div>
+
+                        <button class="btn btn-primary" type="submit" disabled="@_isCreatingComment">
+                            @(_isCreatingComment ? "Beküldés..." : "Komment beküldése")
+                        </button>
+                    </EditForm>
+
+                    @if (_isLoadingComments)
+                    {
+                        <div class="alert alert-info" role="alert">Kommentek betöltése...</div>
+                    }
+                    else if (_comments is null || _comments.Items.Count == 0)
+                    {
+                        <p class="text-muted mb-0">Ehhez a feladathoz még nincs komment.</p>
+                    }
+                    else
+                    {
+                        @foreach (var comment in _comments.Items)
+                        {
+                            <article class="border rounded p-3 mb-3">
+                                <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                                    <div>
+                                        <div class="fw-semibold">@comment.Author.FullName</div>
+                                        <small class="text-muted">@comment.Author.Email</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <small class="text-muted d-block">@comment.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                                        @if (comment.UpdatedAt > comment.CreatedAt)
+                                        {
+                                            <small class="text-muted">Módosítva: @comment.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                                        }
+                                    </div>
+                                </div>
+
+                                @if (_editingCommentId == comment.Id)
+                                {
+                                    <EditForm Model="_editCommentModel" OnValidSubmit="HandleUpdateCommentAsync" class="mb-2">
+                                        <DataAnnotationsValidator />
+
+                                        <div class="mb-2">
+                                            <InputTextArea class="form-control" @bind-Value="_editCommentModel.Content" rows="3" />
+                                            <ValidationMessage For="@(() => _editCommentModel.Content)" />
+                                        </div>
+
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-sm btn-primary" type="submit" disabled="@_isUpdatingComment">
+                                                @(_isUpdatingComment ? "Mentés..." : "Mentés")
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="CancelEditComment">
+                                                Mégse
+                                            </button>
+                                        </div>
+                                    </EditForm>
+                                }
+                                else
+                                {
+                                    <p class="mb-2">@comment.Content</p>
+                                }
+
+                                @if (CanManageComment(comment) && _editingCommentId != comment.Id)
+                                {
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-primary"
+                                                type="button"
+                                                disabled="@(_isUpdatingComment || _deletingCommentId.HasValue)"
+                                                @onclick="() => StartEditComment(comment)">
+                                            Szerkesztés
+                                        </button>
+                                        <button class="btn btn-sm @(_confirmDeleteCommentId == comment.Id ? "btn-danger" : "btn-outline-danger")"
+                                                type="button"
+                                                disabled="@(_isUpdatingComment || _deletingCommentId == comment.Id)"
+                                                @onclick="() => HandleDeleteCommentAsync(comment.Id)">
+                                            @(_deletingCommentId == comment.Id
+                                                ? "Törlés..."
+                                                : (_confirmDeleteCommentId == comment.Id ? "Biztosan törlöd?" : "Törlés"))
+                                        </button>
+                                    </div>
+                                }
+                            </article>
+                        }
+
+                        @if (_comments.TotalPages > 1)
+                        {
+                            <PaginationControls CurrentPage="_commentQuery.Page" TotalPages="_comments.TotalPages" OnPageChange="HandleCommentPageChange" />
+                        }
+                    }
+                </div>
+            </section>
         </div>
 
         <div class="col-md-4">
@@ -193,18 +306,35 @@ else
     private TaskDetailsDto? _task;
     private ProjectDetailsDto? _project;
     private readonly EditTaskModel _editModel = new();
+    private readonly CreateCommentModel _newCommentModel = new();
+    private readonly EditCommentModel _editCommentModel = new();
     private string? _assigneeIdString;
     private string? _errorMessage;
     private string? _successMessage;
+    private PaginatedResultDto<CommentListItemDto>? _comments;
+    private readonly GetCommentsQueryDto _commentQuery = new() { Page = 1, Limit = 5 };
+    private string? _commentsErrorMessage;
+    private string? _commentsSuccessMessage;
     private bool _isLoading = true;
     private bool _isUpdating;
     private bool _isDeleting;
     private bool _isConfirmingDelete;
+    private bool _isLoadingComments;
+    private bool _isCreatingComment;
+    private Guid? _editingCommentId;
+    private bool _isUpdatingComment;
+    private Guid? _confirmDeleteCommentId;
+    private Guid? _deletingCommentId;
 
     protected override async Task OnParametersSetAsync()
     {
         await LoadProjectAsync();
         await LoadTaskAsync();
+
+        if (_task is not null)
+        {
+            await LoadCommentsAsync();
+        }
     }
 
     private async Task LoadProjectAsync()
@@ -237,6 +367,30 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task LoadCommentsAsync(bool resetTransientMessages = true)
+    {
+        _isLoadingComments = true;
+
+        if (resetTransientMessages)
+        {
+            _commentsErrorMessage = null;
+            _commentsSuccessMessage = null;
+        }
+
+        try
+        {
+            _comments = await CommentsApiClient.GetCommentsAsync(TaskId, _commentQuery);
+        }
+        catch (Exception ex)
+        {
+            _commentsErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoadingComments = false;
         }
     }
 
@@ -317,6 +471,137 @@ else
         }
     }
 
+    private async Task HandleCreateCommentAsync()
+    {
+        _isCreatingComment = true;
+        _commentsErrorMessage = null;
+        _commentsSuccessMessage = null;
+
+        try
+        {
+            await CommentsApiClient.CreateCommentAsync(TaskId, new CreateCommentRequestDto
+            {
+                Content = _newCommentModel.Content
+            });
+
+            _newCommentModel.Content = string.Empty;
+            _commentQuery.Page = 1;
+            await LoadCommentsAsync(resetTransientMessages: false);
+            _commentsSuccessMessage = "Komment sikeresen létrehozva.";
+        }
+        catch (Exception ex)
+        {
+            _commentsErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _isCreatingComment = false;
+        }
+    }
+
+    private void StartEditComment(CommentListItemDto comment)
+    {
+        _editingCommentId = comment.Id;
+        _editCommentModel.Content = comment.Content;
+        _commentsErrorMessage = null;
+        _commentsSuccessMessage = null;
+        _confirmDeleteCommentId = null;
+    }
+
+    private void CancelEditComment()
+    {
+        _editingCommentId = null;
+        _editCommentModel.Content = string.Empty;
+    }
+
+    private async Task HandleUpdateCommentAsync()
+    {
+        if (!_editingCommentId.HasValue)
+        {
+            return;
+        }
+
+        _isUpdatingComment = true;
+        _commentsErrorMessage = null;
+        _commentsSuccessMessage = null;
+
+        try
+        {
+            await CommentsApiClient.UpdateCommentAsync(TaskId, _editingCommentId.Value, new UpdateCommentRequestDto
+            {
+                Content = _editCommentModel.Content
+            });
+
+            await LoadCommentsAsync(resetTransientMessages: false);
+            _commentsSuccessMessage = "Komment sikeresen frissítve.";
+            CancelEditComment();
+        }
+        catch (Exception ex)
+        {
+            _commentsErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _isUpdatingComment = false;
+        }
+    }
+
+    private async Task HandleDeleteCommentAsync(Guid commentId)
+    {
+        if (_confirmDeleteCommentId != commentId)
+        {
+            _confirmDeleteCommentId = commentId;
+            return;
+        }
+
+        _deletingCommentId = commentId;
+        _commentsErrorMessage = null;
+        _commentsSuccessMessage = null;
+
+        try
+        {
+            if (_comments is not null && _comments.Items.Count == 1 && _commentQuery.Page > 1)
+            {
+                _commentQuery.Page--;
+            }
+
+            await CommentsApiClient.DeleteCommentAsync(TaskId, commentId);
+            await LoadCommentsAsync(resetTransientMessages: false);
+            _commentsSuccessMessage = "Komment sikeresen törölve.";
+        }
+        catch (Exception ex)
+        {
+            _commentsErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _deletingCommentId = null;
+            _confirmDeleteCommentId = null;
+        }
+    }
+
+    private async Task HandleCommentPageChange(int page)
+    {
+        if (page < 1 || page == _commentQuery.Page)
+        {
+            return;
+        }
+
+        _commentQuery.Page = page;
+        await LoadCommentsAsync();
+    }
+
+    private bool CanManageComment(CommentListItemDto comment)
+    {
+        var currentUserId = AuthSessionStore.CurrentUser?.Id;
+        if (!currentUserId.HasValue)
+        {
+            return false;
+        }
+
+        return comment.AuthorId == currentUserId.Value || _project?.Owner.Id == currentUserId.Value;
+    }
+
     private class EditTaskModel
     {
         [Required]
@@ -334,5 +619,21 @@ else
         public TaskItemPriority Priority { get; set; } = TaskItemPriority.MEDIUM;
 
         public DateTime? DueDate { get; set; }
+    }
+
+    private class CreateCommentModel
+    {
+        [Required]
+        [MinLength(1)]
+        [MaxLength(2000)]
+        public string Content { get; set; } = string.Empty;
+    }
+
+    private class EditCommentModel
+    {
+        [Required]
+        [MinLength(1)]
+        [MaxLength(2000)]
+        public string Content { get; set; } = string.Empty;
     }
 }
