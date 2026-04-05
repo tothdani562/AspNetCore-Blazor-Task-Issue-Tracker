@@ -1,0 +1,408 @@
+{
+  "info": {
+    "name": "TaskTracker - Iteration 2",
+    "description": "Auth backend validation tests for TaskTracker Iteration 2.\n\nIteracio 2 tesztek:\n- POST /auth/register\n- POST /auth/login\n- Password hashing and token issuing flow verification\n- JWT protected endpoint verification\n- Validation and duplicate-user error handling checks",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register - Success",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const uniqueId = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
+                  "pm.environment.set('iteration2UniqueId', uniqueId);",
+                  "pm.environment.set('authEmail', `iteration2.${uniqueId}@example.com`);",
+                  "pm.environment.set('authPassword', 'Passw0rd!123');",
+                  "pm.environment.set('authFullName', 'Iteration 2 User');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Content-Type is application/json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "});",
+                  "",
+                  "pm.test('Response has expected success shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('Response data contains tokens and user payload', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.refreshToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.accessTokenExpiresAt).to.be.a('string');",
+                  "  pm.expect(body.data.refreshTokenExpiresAt).to.be.a('string');",
+                  "  pm.expect(body.data.user).to.be.an('object');",
+                  "  pm.expect(body.data.user.id).to.be.a('string');",
+                  "  pm.expect(body.data.user.email).to.equal(pm.environment.get('authEmail').toLowerCase());",
+                  "  pm.expect(body.data.user.fullName).to.equal(pm.environment.get('authFullName'));",
+                  "});",
+                  "",
+                  "pm.test('Token expiry values are valid ISO dates', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(Number.isNaN(Date.parse(body.data.accessTokenExpiresAt))).to.equal(false);",
+                  "  pm.expect(Number.isNaN(Date.parse(body.data.refreshTokenExpiresAt))).to.equal(false);",
+                  "});",
+                  "",
+                  "pm.test('Store auth variables from register response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('authAccessToken', body.data.accessToken);",
+                  "  pm.environment.set('authRefreshToken', body.data.refreshToken);",
+                  "  pm.environment.set('authUserId', body.data.user.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"fullName\": \"{{authFullName}}\",\n  \"password\": \"{{authPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Create a new user with a generated unique email and store auth variables for subsequent requests."
+          }
+        },
+        {
+          "name": "Register - Duplicate Email Returns 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test('Response follows error shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', false);",
+                  "  pm.expect(body).to.have.property('statusCode', 409);",
+                  "  pm.expect(body).to.have.property('message').that.is.a('string').and.not.empty;",
+                  "  pm.expect(body).to.have.property('path').that.includes('/auth/register');",
+                  "  pm.expect(body).to.have.property('timestamp').that.is.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"fullName\": \"{{authFullName}}\",\n  \"password\": \"{{authPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Submitting the same email twice should return 409 Conflict."
+          }
+        },
+        {
+          "name": "Login - Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has expected success shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('Login returns tokens and user details', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.refreshToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.user.id).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.user.email).to.equal(pm.environment.get('authEmail').toLowerCase());",
+                  "});",
+                  "",
+                  "pm.test('Store auth variables from login response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('authAccessToken', body.data.accessToken);",
+                  "  pm.environment.set('authRefreshToken', body.data.refreshToken);",
+                  "  pm.environment.set('authUserId', body.data.user.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login with the registered user and refresh auth variables."
+          }
+        },
+        {
+          "name": "Protected - Authorized Access",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Protected endpoint returns success payload', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body.data).to.have.property('message', 'Authorized access granted.');",
+                  "  pm.expect(body.data).to.have.property('userId').that.is.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('Protected userId matches authenticated user', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.userId).to.equal(pm.environment.get('authUserId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/protected",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "protected"
+              ]
+            },
+            "description": "Verify that JWT based authorization works on an [Authorize] protected endpoint."
+          }
+        },
+        {
+          "name": "Protected - Unauthorized Without Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('WWW-Authenticate header is present', function () {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate')).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/protected",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "protected"
+              ]
+            },
+            "description": "Call protected endpoint without JWT to verify authorization middleware is enforced."
+          }
+        },
+        {
+          "name": "Login - Validation Error Returns 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response follows validation error shape', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', false);",
+                  "  pm.expect(body).to.have.property('statusCode', 400);",
+                  "  pm.expect(body).to.have.property('message').that.is.a('string').and.not.empty;",
+                  "  pm.expect(body).to.have.property('path').that.includes('/auth/login');",
+                  "  pm.expect(body).to.have.property('timestamp').that.is.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"invalid-email\",\n  \"password\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Verify DataAnnotations based model validation for login payload."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5271",
+      "type": "string"
+    }
+  ]
+}

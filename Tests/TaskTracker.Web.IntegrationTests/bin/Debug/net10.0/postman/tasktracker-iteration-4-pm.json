@@ -1,0 +1,522 @@
+{
+  "info": {
+    "name": "TaskTracker Iteration 4 - Frontend Auth & Session",
+    "description": "Frontend auth oldalak és session kezelés tesztek (Iteráció 4)\nAuth flow teljes tesztelése: register -> login -> me -> refresh -> logout",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth Flow",
+      "item": [
+        {
+          "name": "1. Register - Új felhasználó",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check status code\n",
+                  "pm.test('Status code is 201', function () {\n",
+                  "    pm.response.to.have.status(201);\n",
+                  "});\n",
+                  "\n",
+                  "// Parse response\n",
+                  "const responseJson = pm.response.json();\n",
+                  "\n",
+                  "// Check response structure\n",
+                  "pm.test('Response has success property set to true', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('success', true);\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Response contains data object', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('data');\n",
+                  "    pm.expect(responseJson.data).to.be.an('object');\n",
+                  "});\n",
+                  "\n",
+                  "// Check auth response structure\n",
+                  "pm.test('Auth response contains accessToken', function () {\n",
+                  "    pm.expect(responseJson.data).to.have.property('accessToken');\n",
+                  "    pm.expect(responseJson.data.accessToken).to.be.a('string');\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Auth response contains refreshToken', function () {\n",
+                  "    pm.expect(responseJson.data).to.have.property('refreshToken');\n",
+                  "    pm.expect(responseJson.data.refreshToken).to.be.a('string');\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Auth response contains user object', function () {\n",
+                  "    pm.expect(responseJson.data).to.have.property('user');\n",
+                  "    pm.expect(responseJson.data.user).to.be.an('object');\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('User object contains required fields', function () {\n",
+                  "    pm.expect(responseJson.data.user).to.have.property('id');\n",
+                  "    pm.expect(responseJson.data.user).to.have.property('email');\n",
+                  "    pm.expect(responseJson.data.user).to.have.property('fullName');\n",
+                  "});\n",
+                  "\n",
+                  "// Save tokens to environment\n",
+                  "if (responseJson.data && responseJson.data.accessToken) {\n",
+                  "    pm.environment.set('access_token', responseJson.data.accessToken);\n",
+                  "    pm.environment.set('refresh_token', responseJson.data.refreshToken);\n",
+                  "    pm.environment.set('user_id', responseJson.data.user.id);\n",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"fullName\": \"{{test_fullname}}\",\n  \"password\": \"{{test_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Új felhasználó regisztrálása.\nResponse-ből automatikusan mentjük az access_token és refresh_token-t a környezetbe."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Login - Bejelentkezés",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check status code\n",
+                  "pm.test('Status code is 200', function () {\n",
+                  "    pm.response.to.have.status(200);\n",
+                  "});\n",
+                  "\n",
+                  "// Parse response\n",
+                  "const responseJson = pm.response.json();\n",
+                  "\n",
+                  "// Check response structure\n",
+                  "pm.test('Response has success property set to true', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('success', true);\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Auth response contains accessToken', function () {\n",
+                  "    pm.expect(responseJson.data).to.have.property('accessToken');\n",
+                  "    pm.expect(responseJson.data.accessToken).to.be.a('string');\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Auth response contains refreshToken', function () {\n",
+                  "    pm.expect(responseJson.data).to.have.property('refreshToken');\n",
+                  "    pm.expect(responseJson.data.refreshToken).to.be.a('string');\n",
+                  "});\n",
+                  "\n",
+                  "// Save tokens to environment\n",
+                  "if (responseJson.data && responseJson.data.accessToken) {\n",
+                  "    pm.environment.set('access_token', responseJson.data.accessToken);\n",
+                  "    pm.environment.set('refresh_token', responseJson.data.refreshToken);\n",
+                  "    pm.environment.set('user_id', responseJson.data.user.id);\n",
+                  "    console.log('✓ Tokens saved to environment');\n",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Bejelentkezés meglévő felhasználóval.\nResponse-ből automatikusan mentjük az access_token és refresh_token-t a környezetbe."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Me - Aktuális felhasználó (Védetett)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check status code\n",
+                  "pm.test('Status code is 200', function () {\n",
+                  "    pm.response.to.have.status(200);\n",
+                  "});\n",
+                  "\n",
+                  "// Parse response\n",
+                  "const responseJson = pm.response.json();\n",
+                  "\n",
+                  "// Check response structure\n",
+                  "pm.test('Response has success property set to true', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('success', true);\n",
+                  "});\n",
+                  "\n",
+                  "// Check user data\n",
+                  "pm.test('User object contains required fields', function () {\n",
+                  "    pm.expect(responseJson.data).to.have.property('id');\n",
+                  "    pm.expect(responseJson.data).to.have.property('email');\n",
+                  "    pm.expect(responseJson.data).to.have.property('fullName');\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('User ID matches the session user', function () {\n",
+                  "    pm.expect(responseJson.data.id).to.equal(pm.environment.get('user_id'));\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Response time is less than 1000ms', function () {\n",
+                  "    pm.expect(pm.response.responseTime).to.be.below(1000);\n",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Aktuális bejelentkezett felhasználó adatainak lekérdezése.\nVédetett endpoint - Bearer tokennel kell hívni."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Refresh - Token frissítés",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check status code\n",
+                  "pm.test('Status code is 200', function () {\n",
+                  "    pm.response.to.have.status(200);\n",
+                  "});\n",
+                  "\n",
+                  "// Parse response\n",
+                  "const responseJson = pm.response.json();\n",
+                  "\n",
+                  "// Check response structure\n",
+                  "pm.test('Response has success property set to true', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('success', true);\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('New accessToken is returned', function () {\n",
+                  "    pm.expect(responseJson.data).to.have.property('accessToken');\n",
+                  "    pm.expect(responseJson.data.accessToken).to.be.a('string');\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('New refreshToken is returned', function () {\n",
+                  "    pm.expect(responseJson.data).to.have.property('refreshToken');\n",
+                  "    pm.expect(responseJson.data.refreshToken).to.be.a('string');\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Tokens are different from before (rotation)', function () {\n",
+                  "    const oldAccessToken = pm.environment.get('access_token');\n",
+                  "    const newAccessToken = responseJson.data.accessToken;\n",
+                  "    pm.expect(newAccessToken).to.not.equal(oldAccessToken);\n",
+                  "});\n",
+                  "\n",
+                  "// Save new tokens to environment\n",
+                  "if (responseJson.data && responseJson.data.accessToken) {\n",
+                  "    pm.environment.set('access_token', responseJson.data.accessToken);\n",
+                  "    pm.environment.set('refresh_token', responseJson.data.refreshToken);\n",
+                  "    console.log('✓ New tokens saved to environment');\n",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Access token frissítése a refresh token-nel.\nÚj tokenek kerülnek visszaadásra, a régi tokenek érvénytelenné válnak."
+          },
+          "response": []
+        },
+        {
+          "name": "5. Logout - Kijelentkezés (Védetett)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check status code\n",
+                  "pm.test('Status code is 200', function () {\n",
+                  "    pm.response.to.have.status(200);\n",
+                  "});\n",
+                  "\n",
+                  "// Parse response\n",
+                  "const responseJson = pm.response.json();\n",
+                  "\n",
+                  "// Check response structure\n",
+                  "pm.test('Response has success property set to true', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('success', true);\n",
+                  "});\n",
+                  "\n",
+                  "// Clear tokens from environment\n",
+                  "pm.environment.set('access_token', '');\n",
+                  "pm.environment.set('refresh_token', '');\n",
+                  "console.log('✓ Tokens cleared from environment after logout');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Kijelentkezés - refresh token érvénytelen lesz.\nVédetett endpoint - Bearer tokennel kell hívni."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Cases",
+      "item": [
+        {
+          "name": "Register - már létezik email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check status code\n",
+                  "pm.test('Status code is 409 Conflict', function () {\n",
+                  "    pm.response.to.have.status(409);\n",
+                  "});\n",
+                  "\n",
+                  "// Parse response\n",
+                  "const responseJson = pm.response.json();\n",
+                  "\n",
+                  "// Check error response structure\n",
+                  "pm.test('Error response has success property set to false', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('success', false);\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Error response contains statusCode', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('statusCode', 409);\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Error response contains message', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('message');\n",
+                  "    pm.expect(responseJson.message).to.be.a('string');\n",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"fullName\": \"Duplicate User\",\n  \"password\": \"Password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Regisztrációs hiba: már létezik email cím."
+          },
+          "response": []
+        },
+        {
+          "name": "Login - hibás jelszó",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check status code\n",
+                  "pm.test('Status code is 401 Unauthorized', function () {\n",
+                  "    pm.response.to.have.status(401);\n",
+                  "});\n",
+                  "\n",
+                  "// Parse response\n",
+                  "const responseJson = pm.response.json();\n",
+                  "\n",
+                  "// Check error response structure\n",
+                  "pm.test('Error response has success property set to false', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('success', false);\n",
+                  "});\n",
+                  "\n",
+                  "pm.test('Error response contains statusCode 401', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('statusCode', 401);\n",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"WrongPassword123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login hiba: hibás jelszó."
+          },
+          "response": []
+        },
+        {
+          "name": "Me - Nincs token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check status code\n",
+                  "pm.test('Status code is 401 Unauthorized', function () {\n",
+                  "    pm.response.to.have.status(401);\n",
+                  "});\n",
+                  "\n",
+                  "// Parse response\n",
+                  "const responseJson = pm.response.json();\n",
+                  "\n",
+                  "// Check error response structure\n",
+                  "pm.test('Error response has success property set to false', function () {\n",
+                  "    pm.expect(responseJson).to.have.property('success', false);\n",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Védetett endpoint elérése token nélkül - 401 Unauthorized."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "id": "a7d2c4f1-8e95-4c2d-b1a9-3f6e8c9d5a2f",
+  "name": "TaskTracker - Iteration 1",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5271",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "apiVersion",
+      "value": "v1",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "timeout",
+      "value": "5000",
+      "enabled": true,
+      "type": "number"
+    },
+    {
+      "key": "dbUrl",
+      "value": "postgresql://tasktracker:tasktracker@localhost:5432/tasktracker",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "dbHost",
+      "value": "localhost",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "dbPort",
+      "value": "5432",
+      "enabled": true,
+      "type": "number"
+    },
+    {
+      "key": "dbName",
+      "value": "tasktracker",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "dbUser",
+      "value": "tasktracker",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "dbPassword",
+      "value": "tasktracker",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "environment",
+      "value": "Development",
+      "enabled": true,
+      "type": "string"
+    },
+    {
+      "key": "lastResponseTime",
+      "value": "",
+      "enabled": true,
+      "type": "string"
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-03-31T12:00:00.000Z",
+  "_postman_exported_using": "Postman/11.0.0"
+}

@@ -1,0 +1,134 @@
+{
+  "info": {
+    "name": "TaskTracker - Iteration 0",
+    "description": "Health-check and API basic structure validation tests for TaskTracker Iteration 0 (Foundation)\n\nIteráció 0 tesztek:\n- API response shape validálása (success + data)\n- Health-check endpoint tesztelése\n- HTTP status kódok ellenőrzése\n- Response headers validálása",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Status code validation",
+              "pm.test('Status code is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// Response time validation",
+              "pm.test('Response time is less than 1000ms', function () {",
+              "  pm.expect(pm.response.responseTime).to.be.below(1000);",
+              "});",
+              "",
+              "// Parse response body",
+              "const responseJson = pm.response.json();",
+              "",
+              "// Validate response structure has 'success' property",
+              "pm.test('Response has success property', function () {",
+              "  pm.expect(responseJson).to.have.property('success');",
+              "});",
+              "",
+              "// Validate success property is boolean",
+              "pm.test('Success property is a boolean', function () {",
+              "  pm.expect(responseJson.success).to.be.a('boolean');",
+              "});",
+              "",
+              "// Validate response has 'data' property",
+              "pm.test('Response has data property', function () {",
+              "  pm.expect(responseJson).to.have.property('data');",
+              "});",
+              "",
+              "// Validate data is an object",
+              "pm.test('Data property is an object', function () {",
+              "  pm.expect(responseJson.data).to.be.an('object');",
+              "});",
+              "",
+              "// Validate the success value is true for health-check",
+              "pm.test('Health-check returns success: true', function () {",
+              "  pm.expect(responseJson.success).to.equal(true);",
+              "});",
+              "",
+              "// Validate response headers",
+              "pm.test('Content-Type is application/json', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+              "});",
+              "",
+              "// Validate response size is reasonable",
+              "pm.test('Response size is less than 1KB', function () {",
+              "  pm.expect(pm.response.text().length).to.be.below(1024);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            ""
+          ]
+        },
+        "description": "Health-check endpoint that returns basic API structure validation.\n\nExpected response format:\n```json\n{\n  \"success\": true,\n  \"data\": {}\n}\n```\n\nEz a végpont igazolja, hogy az alkalmazás elérhető és az API response shape helyesen van konfigurálva."
+      },
+      "response": [
+        {
+          "name": "Success - Health Check OK",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "21"
+            }
+          ],
+          "body": "{\"success\":true,\"data\":{}}"
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "{{baseUrl}}",
+      "type": "string"
+    }
+  ]
+}
