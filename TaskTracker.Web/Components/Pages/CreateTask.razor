@@ -19,16 +19,13 @@
             <p class="text-muted mb-4">Projekt: @_project.Name</p>
         }
 
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <div class="alert alert-danger" role="alert">@_errorMessage</div>
-        }
+        <FeedbackMessage Message="@_errorMessage" Type="FeedbackMessage.FeedbackType.Error" />
 
-        <div class="card">
+        <div class="card tt-form">
             <div class="card-body">
                 <EditForm Model="_createModel" OnValidSubmit="HandleCreateAsync">
                     <DataAnnotationsValidator />
-                    <ValidationSummary />
+                    <ValidationErrors />
 
                     <div class="mb-3">
                         <label class="form-label" for="title">Cím</label>
@@ -114,7 +111,10 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
     }
 
@@ -134,7 +134,10 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {

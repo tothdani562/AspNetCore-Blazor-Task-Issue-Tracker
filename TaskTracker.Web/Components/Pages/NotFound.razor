@@ -1,5 +1,23 @@
 ﻿@page "/not-found"
+@page "/404"
 @layout MainLayout
+@inject NavigationManager NavigationManager
 
-<h3>Not Found</h3>
-<p>Sorry, the content you are looking for does not exist.</p>
+<PageTitle>404 - Nem talalhato</PageTitle>
+
+<div class="tt-status-page">
+	<h1>404</h1>
+	<h2>Nem talalhato</h2>
+	<p>A keresett oldal vagy eroforras nem erheto el.</p>
+	<div class="d-flex gap-2 justify-content-center">
+		<a class="btn btn-primary" href="/app/projects">Projektjeim</a>
+		<button class="btn btn-outline-secondary" type="button" @onclick="GoBack">Vissza</button>
+	</div>
+</div>
+
+@code {
+	private void GoBack()
+	{
+		NavigationManager.NavigateTo("/home", forceLoad: false);
+	}
+}

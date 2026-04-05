@@ -2,6 +2,19 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
+:root {
+    --tt-border: #dbe4ee;
+    --tt-text-soft: #5c7084;
+    --tt-info-bg: #edf6ff;
+    --tt-info-border: #cfe3f7;
+    --tt-success-bg: #ebf8ef;
+    --tt-success-border: #b7e3c4;
+    --tt-warning-bg: #fff5e8;
+    --tt-warning-border: #f7d7a8;
+    --tt-error-bg: #fff1f1;
+    --tt-error-border: #f3c2c2;
+}
+
 a, .btn-link {
     color: #006bb7;
 }
@@ -67,4 +80,143 @@ h1:focus {
 .nav-user-info {
     font-weight: 600;
     opacity: 0.95;
+}
+
+.tt-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.6rem;
+    background: var(--tt-info-bg);
+    border: 1px solid var(--tt-info-border);
+    color: #264f73;
+    font-weight: 500;
+}
+
+.tt-feedback {
+    border: 1px solid transparent;
+    border-radius: 0.75rem;
+    padding: 0.8rem 0.95rem;
+    margin-bottom: 1rem;
+}
+
+.tt-feedback-info {
+    background: var(--tt-info-bg);
+    border-color: var(--tt-info-border);
+    color: #264f73;
+}
+
+.tt-feedback-success {
+    background: var(--tt-success-bg);
+    border-color: var(--tt-success-border);
+    color: #1f6a3d;
+}
+
+.tt-feedback-warning {
+    background: var(--tt-warning-bg);
+    border-color: var(--tt-warning-border);
+    color: #8a5f12;
+}
+
+.tt-feedback-error {
+    background: var(--tt-error-bg);
+    border-color: var(--tt-error-border);
+    color: #8b2626;
+}
+
+.tt-validation-summary {
+    margin-bottom: 1rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.7rem;
+    border: 1px solid var(--tt-error-border);
+    background: var(--tt-error-bg);
+}
+
+.tt-validation-summary ul {
+    margin-bottom: 0;
+    padding-left: 1.1rem;
+}
+
+.tt-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(12, 22, 31, 0.55);
+    z-index: 1050;
+}
+
+.tt-dialog {
+    position: fixed;
+    z-index: 1051;
+    width: min(92vw, 420px);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 0.95rem;
+    border: 1px solid var(--tt-border);
+    box-shadow: 0 14px 40px rgba(13, 22, 35, 0.25);
+    padding: 1.1rem;
+}
+
+.tt-form {
+    border: 1px solid var(--tt-border);
+    border-radius: 0.9rem;
+    background: #fff;
+    box-shadow: 0 5px 18px rgba(10, 24, 42, 0.04);
+}
+
+.tt-form .card-body {
+    padding: 1.2rem;
+}
+
+.tt-form .form-control,
+.tt-form .form-select {
+    border-color: #cfdbe7;
+    border-radius: 0.65rem;
+}
+
+.tt-form .form-label {
+    font-weight: 600;
+    color: #14324a;
+}
+
+.tt-status-page {
+    max-width: 640px;
+    margin: 2.5rem auto;
+    text-align: center;
+    background: #fff;
+    border: 1px solid var(--tt-border);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    box-shadow: 0 10px 28px rgba(12, 28, 44, 0.07);
+}
+
+.tt-status-page h1 {
+    font-size: 3.2rem;
+    margin-bottom: 0.6rem;
+    color: #14324a;
+}
+
+.tt-status-page h2 {
+    margin-bottom: 0.7rem;
+}
+
+.tt-status-page p {
+    color: var(--tt-text-soft);
+    margin-bottom: 1.2rem;
+}
+
+.tt-breakword {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.tt-no-overflow {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.row > [class*="col-"] {
+    min-width: 0;
 }

@@ -23,7 +23,7 @@
                         </a>
                         @if (!string.IsNullOrWhiteSpace(task.Description))
                         {
-                            <div class="text-muted small mt-1">@task.Description</div>
+                            <div class="text-muted small mt-1" title="@task.Description">@GetDescriptionPreview(task.Description)</div>
                         }
                     </td>
                     <td>
@@ -83,11 +83,25 @@
 
     private string GetDeleteButtonClass(Guid taskId)
     {
-        return DeletingTaskId == taskId ? "btn-outline-danger" : "btn-outline-warning";
+        return DeletingTaskId == taskId ? "btn-danger" : "btn-outline-danger";
     }
 
     private string GetDeleteButtonText(Guid taskId)
     {
-        return DeletingTaskId == taskId ? "Biztosan? (Megerősítés)" : "Törlés";
+        return DeletingTaskId == taskId ? "Torles..." : "Torles";
+    }
+
+    private static string GetDescriptionPreview(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return string.Empty;
+        }
+
+        const int maxLength = 30;
+        var normalized = description.Trim();
+        return normalized.Length <= maxLength
+            ? normalized
+            : normalized[..maxLength] + "...";
     }
 }

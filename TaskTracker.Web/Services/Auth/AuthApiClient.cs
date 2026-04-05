@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using TaskTracker.Web.Dtos;
 using TaskTracker.Web.Dtos.Auth;
+using TaskTracker.Web.Services.Api;
 
 namespace TaskTracker.Web.Services.Auth;
 
@@ -38,7 +39,7 @@ public class AuthApiClient : IAuthApiClient
         using var response = await client.GetAsync("auth/me", cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(await ReadErrorMessageAsync(response, cancellationToken));
+            throw await ApiErrorMapper.CreateExceptionAsync(response, cancellationToken);
         }
 
         var body = await response.Content.ReadFromJsonAsync<ApiResponse<AuthUserDto>>(cancellationToken);
@@ -57,7 +58,7 @@ public class AuthApiClient : IAuthApiClient
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(await ReadErrorMessageAsync(response, cancellationToken));
+            throw await ApiErrorMapper.CreateExceptionAsync(response, cancellationToken);
         }
     }
 
@@ -70,7 +71,7 @@ public class AuthApiClient : IAuthApiClient
         using var response = await client.PostAsJsonAsync(endpoint, request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(await ReadErrorMessageAsync(response, cancellationToken));
+            throw await ApiErrorMapper.CreateExceptionAsync(response, cancellationToken);
         }
 
         var body = await response.Content.ReadFromJsonAsync<ApiResponse<AuthResponseDto>>(cancellationToken);
@@ -95,22 +96,5 @@ public class AuthApiClient : IAuthApiClient
         }
 
         return client;
-    }
-
-    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(cancellationToken);
-            if (!string.IsNullOrWhiteSpace(error?.Message))
-            {
-                return error.Message;
-            }
-        }
-        catch
-        {
-        }
-
-        return $"A keres nem sikerult. HTTP {(int)response.StatusCode}.";
     }
 }

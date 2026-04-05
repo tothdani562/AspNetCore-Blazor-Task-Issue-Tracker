@@ -31,18 +31,15 @@
 
 @if (_isLoading)
 {
-    <div class="alert alert-info" role="alert">Feladatok betöltése...</div>
+    <LoadingIndicator Text="Feladatok betoltese..." />
 }
 else if (!string.IsNullOrWhiteSpace(_errorMessage))
 {
-    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+    <FeedbackMessage Message="@_errorMessage" Type="FeedbackMessage.FeedbackType.Error" />
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(_successMessage))
-    {
-        <div class="alert alert-success" role="alert">@_successMessage</div>
-    }
+    <FeedbackMessage Message="@_successMessage" Type="FeedbackMessage.FeedbackType.Success" />
 
     <TaskFilters CurrentQuery="_currentQuery" OnFilterChange="HandleFilterChange" />
 
@@ -86,6 +83,16 @@ else
     }
 }
 
+<ConfirmDialog
+    IsOpen="@_pendingDeleteTaskId.HasValue"
+    IsBusy="@_isDeletingTaskId.HasValue"
+    Title="Feladat torlese"
+    Message="@GetDeleteTaskMessage()"
+    ConfirmText="Feladat torlese"
+    BusyConfirmText="Torles..."
+    OnConfirm="ConfirmDeleteTaskAsync"
+    OnCancel="CancelDeleteTaskAsync" />
+
 <div class="mt-4">
     <button class="btn btn-outline-secondary" type="button" @onclick="NavigateToProject">
         Vissza a projekthez
@@ -103,6 +110,8 @@ else
     private string? _successMessage;
     private bool _isLoading = true;
     private Guid? _isDeletingTaskId;
+    private Guid? _pendingDeleteTaskId;
+    private string? _pendingDeleteTaskTitle;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -131,7 +140,10 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -154,7 +166,10 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -178,25 +193,56 @@ else
 
     private async Task HandleDeleteTaskAsync(Guid taskId)
     {
-        if (_isDeletingTaskId == taskId)
+        _pendingDeleteTaskId = taskId;
+        _pendingDeleteTaskTitle = _tasks?.Items.FirstOrDefault(task => task.Id == taskId)?.Title;
+        await Task.CompletedTask;
+    }
+
+    private Task CancelDeleteTaskAsync()
+    {
+        _pendingDeleteTaskId = null;
+        _pendingDeleteTaskTitle = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmDeleteTaskAsync()
+    {
+        if (!_pendingDeleteTaskId.HasValue)
+        {
+            return;
+        }
+
+        var taskId = _pendingDeleteTaskId.Value;
+        _isDeletingTaskId = taskId;
+        _errorMessage = null;
+
+        try
+        {
+            await TasksApiClient.DeleteTaskAsync(ProjectId, taskId);
+            await LoadTasksAsync(resetTransientMessages: false);
+            _successMessage = "Feladat sikeresen torolve.";
+        }
+        catch (Exception ex)
+        {
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
+        }
+        finally
         {
             _isDeletingTaskId = null;
+            await CancelDeleteTaskAsync();
+        }
+    }
 
-            try
-            {
-                await TasksApiClient.DeleteTaskAsync(ProjectId, taskId);
-                await LoadTasksAsync(resetTransientMessages: false);
-                _successMessage = "Feladat sikeresen törölve.";
-            }
-            catch (Exception ex)
-            {
-                _errorMessage = ex.Message;
-            }
-        }
-        else
-        {
-            _isDeletingTaskId = taskId;
-        }
+    private string GetDeleteTaskMessage()
+    {
+        var taskName = string.IsNullOrWhiteSpace(_pendingDeleteTaskTitle)
+            ? "ezt a feladatot"
+            : $"a(z) '{_pendingDeleteTaskTitle}' feladatot";
+
+        return $"Biztosan torlod {taskName}?";
     }
 
     private void ResetFilters()

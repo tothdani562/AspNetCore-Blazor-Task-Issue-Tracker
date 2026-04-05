@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using TaskTracker.Web.Dtos;
 using TaskTracker.Web.Dtos.Projects;
+using TaskTracker.Web.Services.Api;
 using TaskTracker.Web.Services.Auth;
 
 namespace TaskTracker.Web.Services.Projects;
@@ -104,7 +105,7 @@ public class ProjectsApiClient : IProjectsApiClient
     {
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(await ReadErrorMessageAsync(response, cancellationToken));
+            throw await ApiErrorMapper.CreateExceptionAsync(response, cancellationToken);
         }
     }
 
@@ -122,22 +123,5 @@ public class ProjectsApiClient : IProjectsApiClient
         }
 
         return data;
-    }
-
-    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(cancellationToken);
-            if (!string.IsNullOrWhiteSpace(error?.Message))
-            {
-                return error.Message;
-            }
-        }
-        catch
-        {
-        }
-
-        return $"A keres nem sikerult. HTTP {(int)response.StatusCode}.";
     }
 }
