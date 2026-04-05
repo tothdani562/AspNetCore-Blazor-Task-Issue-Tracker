@@ -1,8 +1,10 @@
 using TaskTracker.Web.Components;
+using TaskTracker.Web.Configuration;
 using TaskTracker.Web.Exceptions;
 using TaskTracker.Web.Data;
 using TaskTracker.Web.Auth;
 using TaskTracker.Web.Dtos;
+using TaskTracker.Web.Middleware;
 using TaskTracker.Web.Services;
 using TaskTracker.Web.Services.Auth;
 using TaskTracker.Web.Services.Comments;
@@ -11,20 +13,104 @@ using TaskTracker.Web.Services.Tasks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.AddServerHeader = false;
+});
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddOptions<DatabaseOptions>()
+    .Bind(builder.Configuration.GetSection(DatabaseOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddOptions<AppCorsOptions>()
+    .Bind(builder.Configuration.GetSection(AppCorsOptions.SectionName))
+    .ValidateOnStart();
+
+builder.Services.AddOptions<AuthRateLimitingOptions>()
+    .Bind(builder.Configuration.GetSection(AuthRateLimitingOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddOptions<JwtOptions>()
+    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+var databaseOptions = builder.Configuration
+    .GetSection(DatabaseOptions.SectionName)
+    .Get<DatabaseOptions>() ?? new DatabaseOptions();
+
+var corsOptions = builder.Configuration
+    .GetSection(AppCorsOptions.SectionName)
+    .Get<AppCorsOptions>() ?? new AppCorsOptions();
+
+var authRateLimitingOptions = builder.Configuration
+    .GetSection(AuthRateLimitingOptions.SectionName)
+    .Get<AuthRateLimitingOptions>() ?? new AuthRateLimitingOptions();
+
 // Database context
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(
+        connectionString,
+        npgsqlOptions =>
+        {
+            if (databaseOptions.EnableRetryOnFailure)
+            {
+                npgsqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: databaseOptions.MaxRetryCount,
+                    maxRetryDelay: TimeSpan.FromSeconds(databaseOptions.MaxRetryDelaySeconds),
+                    errorCodesToAdd: null);
+            }
+
+            npgsqlOptions.CommandTimeout(databaseOptions.CommandTimeoutSeconds);
+        }));
+
+if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing") && corsOptions.AllowedOrigins.Count == 0)
+{
+    throw new InvalidOperationException("Cors:AllowedOrigins must be configured outside Development and Testing environments.");
+}
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("TaskTrackerCors", policy =>
+    {
+        if (corsOptions.AllowedOrigins.Count == 0)
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+            return;
+        }
+
+        policy.WithOrigins(corsOptions.AllowedOrigins.ToArray())
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+
+        if (corsOptions.AllowCredentials)
+        {
+            policy.AllowCredentials();
+        }
+    });
+});
 
 // API Controllers
 builder.Services.AddControllers();
@@ -56,21 +142,110 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
 
+if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing") && IsDevelopmentSigningKey(jwtOptions.SigningKey))
+{
+    throw new InvalidOperationException("A development JWT signing key nem hasznalhato ebben a kornyezetben. Allits be biztonsagos kulcsot a Jwt__SigningKey environment valtozoban.");
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing");
+        options.IncludeErrorDetails = builder.Environment.IsDevelopment();
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = jwtOptions.Issuer,
             ValidateAudience = true,
             ValidAudience = jwtOptions.Audience,
+            RequireExpirationTime = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
             ClockSkew = TimeSpan.Zero
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                if (context.Response.HasStarted)
+                {
+                    return;
+                }
+
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+
+                await context.Response.WriteAsJsonAsync(new ErrorResponse
+                {
+                    Success = false,
+                    StatusCode = StatusCodes.Status401Unauthorized,
+                    Message = "Hianyzik vagy ervenytelen a bearer token.",
+                    Path = context.HttpContext.Request.Path,
+                    Timestamp = DateTime.UtcNow
+                });
+            },
+            OnForbidden = async context =>
+            {
+                if (context.Response.HasStarted)
+                {
+                    return;
+                }
+
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/json";
+
+                await context.Response.WriteAsJsonAsync(new ErrorResponse
+                {
+                    Success = false,
+                    StatusCode = StatusCodes.Status403Forbidden,
+                    Message = "Nincs jogosultsagod a kert eroforras eleresehez.",
+                    Path = context.Request.Path,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+        };
     });
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("auth-endpoints", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = authRateLimitingOptions.PermitLimit,
+                Window = TimeSpan.FromSeconds(authRateLimitingOptions.WindowSeconds),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var response = context.HttpContext.Response;
+        response.ContentType = "application/json";
+
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
+        {
+            response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        }
+
+        await response.WriteAsJsonAsync(new ErrorResponse
+        {
+            Success = false,
+            StatusCode = StatusCodes.Status429TooManyRequests,
+            Message = "Tul sok auth kerest kuldtel rovid idon belul. Probald ujra kesobb.",
+            Path = context.HttpContext.Request.Path,
+            Timestamp = DateTime.UtcNow
+        }, cancellationToken);
+    };
+});
 
 builder.Services.AddAuthorization();
 builder.Services.AddAuthorizationCore();
@@ -165,7 +340,14 @@ if (!app.Environment.IsEnvironment("Testing"))
         catch (Exception ex)
         {
             app.Logger.LogError(ex, "An error occurred while initializing the database.");
-            throw;
+
+            if (databaseOptions.FailOnStartupError)
+            {
+                throw;
+            }
+
+            app.Logger.LogCritical(
+                "Application startup continues despite database initialization failure because Database:FailOnStartupError=false. API calls that require DB access may fail until the database becomes available.");
         }
     }
 }
@@ -189,8 +371,12 @@ else
 
 // Globális exception handling middleware
 app.UseExceptionHandlingMiddleware();
+app.UseAuthAuditLogging();
+
+app.UseRateLimiter();
 
 app.UseHttpsRedirection();
+app.UseCors("TaskTrackerCors");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -287,6 +473,24 @@ CREATE INDEX IF NOT EXISTS ""IX_ProjectMembers_UserId"" ON ""ProjectMembers"" ("
     ");
 
     logger.LogInformation("Project schema recreated successfully.");
+}
+
+static string GetRateLimitPartitionKey(HttpContext httpContext)
+{
+    var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+    if (!string.IsNullOrWhiteSpace(forwardedFor))
+    {
+        return forwardedFor.Split(',')[0].Trim();
+    }
+
+    return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
+
+static bool IsDevelopmentSigningKey(string signingKey)
+{
+    return string.IsNullOrWhiteSpace(signingKey)
+        || signingKey.Contains("DEVELOPMENT_ONLY", StringComparison.OrdinalIgnoreCase)
+        || signingKey.StartsWith("THIS_IS_A_DEVELOPMENT", StringComparison.OrdinalIgnoreCase);
 }
 
 public partial class Program
