@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TaskTracker.Web.Dtos;
 using TaskTracker.Web.Dtos.Auth;
 using TaskTracker.Web.Services;
@@ -8,6 +9,7 @@ namespace TaskTracker.Web.Controllers;
 
 [ApiController]
 [Route("auth")]
+[EnableRateLimiting("auth-endpoints")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;

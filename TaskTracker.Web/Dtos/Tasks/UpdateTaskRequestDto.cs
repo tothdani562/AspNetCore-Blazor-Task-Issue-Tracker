@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using TaskTracker.Web.Models;
+using TaskTracker.Web.Validation;
 
 namespace TaskTracker.Web.Dtos.Tasks;
 
 public class UpdateTaskRequestDto
 {
+    [NotWhiteSpace]
     [MinLength(3)]
     [MaxLength(200)]
     public string? Title { get; set; }
