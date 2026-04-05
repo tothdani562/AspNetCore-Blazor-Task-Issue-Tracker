@@ -17,15 +17,15 @@
     <div class="col-md-8">
         @if (_isLoading)
         {
-            <div class="alert alert-info" role="alert">Feladat betöltése...</div>
+            <LoadingIndicator Text="Feladat betoltese..." />
         }
         else if (!string.IsNullOrWhiteSpace(_errorMessage))
         {
-            <div class="alert alert-danger" role="alert">@_errorMessage</div>
+            <FeedbackMessage Message="@_errorMessage" Type="FeedbackMessage.FeedbackType.Error" />
         }
         else if (_task is null)
         {
-            <div class="alert alert-warning" role="alert">A feladat nem található.</div>
+            <FeedbackMessage Message="A feladat nem talalhato." Type="FeedbackMessage.FeedbackType.Warning" />
         }
         else
         {
@@ -35,11 +35,11 @@
                 <p class="text-muted mb-4">Projekt: @_project.Name</p>
             }
 
-            <div class="card">
+            <div class="card tt-form">
                 <div class="card-body">
                     <EditForm Model="_editModel" OnValidSubmit="HandleUpdateAsync">
                         <DataAnnotationsValidator />
-                        <ValidationSummary />
+                        <ValidationErrors />
 
                         <div class="mb-3">
                             <label class="form-label" for="title">Cím</label>
@@ -132,7 +132,10 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
     }
 
@@ -148,7 +151,10 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -192,7 +198,10 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {

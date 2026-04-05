@@ -7,36 +7,35 @@
 
 <h1>Regisztracio</h1>
 
-@if (!string.IsNullOrWhiteSpace(_errorMessage))
-{
-    <div class="alert alert-danger" role="alert">@_errorMessage</div>
-}
+<FeedbackMessage Message="@_errorMessage" Type="FeedbackMessage.FeedbackType.Error" />
 
-<EditForm Model="_model" OnValidSubmit="HandleSubmitAsync">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+<EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" class="tt-form">
+    <div class="card-body">
+        <DataAnnotationsValidator />
+        <ValidationErrors />
 
-    <div class="mb-3">
-        <label class="form-label" for="fullName">Teljes nev</label>
-        <InputText id="fullName" class="form-control" @bind-Value="_model.FullName" />
-        <ValidationMessage For="@(() => _model.FullName)" />
+        <div class="mb-3">
+            <label class="form-label" for="fullName">Teljes nev</label>
+            <InputText id="fullName" class="form-control" @bind-Value="_model.FullName" />
+            <ValidationMessage For="@(() => _model.FullName)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="email">Email</label>
+            <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+            <ValidationMessage For="@(() => _model.Email)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="password">Jelszo</label>
+            <InputText id="password" type="password" class="form-control" @bind-Value="_model.Password" />
+            <ValidationMessage For="@(() => _model.Password)" />
+        </div>
+
+        <button class="btn btn-primary" type="submit" disabled="@_isSubmitting">
+            @(_isSubmitting ? "Regisztracio..." : "Regisztracio")
+        </button>
     </div>
-
-    <div class="mb-3">
-        <label class="form-label" for="email">Email</label>
-        <InputText id="email" class="form-control" @bind-Value="_model.Email" />
-        <ValidationMessage For="@(() => _model.Email)" />
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label" for="password">Jelszo</label>
-        <InputText id="password" type="password" class="form-control" @bind-Value="_model.Password" />
-        <ValidationMessage For="@(() => _model.Password)" />
-    </div>
-
-    <button class="btn btn-primary" type="submit" disabled="@_isSubmitting">
-        @(_isSubmitting ? "Regisztracio..." : "Regisztracio")
-    </button>
 </EditForm>
 
 <p class="mt-3">
@@ -60,7 +59,10 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {

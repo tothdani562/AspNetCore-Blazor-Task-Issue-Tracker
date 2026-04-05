@@ -20,34 +20,31 @@
 
 @if (_isLoading)
 {
-    <div class="alert alert-info" role="alert">Feladat betöltése...</div>
+    <LoadingIndicator Text="Feladat betoltese..." />
 }
 else if (!string.IsNullOrWhiteSpace(_errorMessage))
 {
-    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+    <FeedbackMessage Message="@_errorMessage" Type="FeedbackMessage.FeedbackType.Error" />
 }
 else if (_task is null)
 {
-    <div class="alert alert-warning" role="alert">A feladat nem található.</div>
+    <FeedbackMessage Message="A feladat nem talalhato." Type="FeedbackMessage.FeedbackType.Warning" />
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(_successMessage))
-    {
-        <div class="alert alert-success" role="alert">@_successMessage</div>
-    }
+    <FeedbackMessage Message="@_successMessage" Type="FeedbackMessage.FeedbackType.Success" />
 
     <h1>@_task.Title</h1>
     <p class="text-muted mb-4">Projekt: @_project?.Name</p>
 
-    <div class="row">
-        <div class="col-md-8">
+    <div class="row tt-no-overflow">
+        <div class="col-md-8 tt-no-overflow">
             <section class="card mb-4">
                 <div class="card-body">
                     <h2 class="h5 mb-3">Leírás</h2>
                     @if (!string.IsNullOrWhiteSpace(_task.Description))
                     {
-                        <p>@_task.Description</p>
+                        <p class="tt-breakword">@_task.Description</p>
                     }
                     else
                     {
@@ -62,7 +59,7 @@ else
 
                     <EditForm Model="_editModel" OnValidSubmit="HandleUpdateAsync">
                         <DataAnnotationsValidator />
-                        <ValidationSummary />
+                        <ValidationErrors />
 
                         <div class="mb-3">
                             <label class="form-label" for="taskTitle">Cím</label>
@@ -72,7 +69,7 @@ else
 
                         <div class="mb-3">
                             <label class="form-label" for="taskDescription">Leírás</label>
-                            <InputTextArea id="taskDescription" class="form-control" @bind-Value="_editModel.Description" />
+                            <InputTextArea id="taskDescription" class="form-control tt-breakword" @bind-Value="_editModel.Description" />
                             <ValidationMessage For="@(() => _editModel.Description)" />
                         </div>
 
@@ -122,15 +119,8 @@ else
                 <div class="card-body">
                     <h2 class="h5 mb-3">Kommentek</h2>
 
-                    @if (!string.IsNullOrWhiteSpace(_commentsSuccessMessage))
-                    {
-                        <div class="alert alert-success" role="alert">@_commentsSuccessMessage</div>
-                    }
-
-                    @if (!string.IsNullOrWhiteSpace(_commentsErrorMessage))
-                    {
-                        <div class="alert alert-danger" role="alert">@_commentsErrorMessage</div>
-                    }
+                    <FeedbackMessage Message="@_commentsSuccessMessage" Type="FeedbackMessage.FeedbackType.Success" />
+                    <FeedbackMessage Message="@_commentsErrorMessage" Type="FeedbackMessage.FeedbackType.Error" />
 
                     <EditForm Model="_newCommentModel" OnValidSubmit="HandleCreateCommentAsync" class="mb-4">
                         <DataAnnotationsValidator />
@@ -148,7 +138,7 @@ else
 
                     @if (_isLoadingComments)
                     {
-                        <div class="alert alert-info" role="alert">Kommentek betöltése...</div>
+                        <LoadingIndicator Text="Kommentek betoltese..." />
                     }
                     else if (_comments is null || _comments.Items.Count == 0)
                     {
@@ -195,7 +185,7 @@ else
                                 }
                                 else
                                 {
-                                    <p class="mb-2">@comment.Content</p>
+                                    <p class="mb-2 tt-breakword">@comment.Content</p>
                                 }
 
                                 @if (CanManageComment(comment) && _editingCommentId != comment.Id)
@@ -207,13 +197,13 @@ else
                                                 @onclick="() => StartEditComment(comment)">
                                             Szerkesztés
                                         </button>
-                                        <button class="btn btn-sm @(_confirmDeleteCommentId == comment.Id ? "btn-danger" : "btn-outline-danger")"
+                                        <button class="btn btn-sm btn-outline-danger"
                                                 type="button"
                                                 disabled="@(_isUpdatingComment || _deletingCommentId == comment.Id)"
-                                                @onclick="() => HandleDeleteCommentAsync(comment.Id)">
+                                                @onclick="() => OpenDeleteCommentDialog(comment.Id)">
                                             @(_deletingCommentId == comment.Id
                                                 ? "Törlés..."
-                                                : (_confirmDeleteCommentId == comment.Id ? "Biztosan törlöd?" : "Törlés"))
+                                                : "Törlés")
                                         </button>
                                     </div>
                                 }
@@ -229,7 +219,7 @@ else
             </section>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-4 tt-no-overflow">
             <section class="card">
                 <div class="card-body">
                     <h2 class="h5 mb-3">Adatok</h2>
@@ -289,12 +279,32 @@ else
         <a href="@($"/app/projects/{ProjectId}/tasks")" class="btn btn-outline-secondary">
             Vissza a listához
         </a>
-        <button class="btn @(_isConfirmingDelete ? "btn-outline-danger" : "btn-outline-warning")" type="button" 
+        <button class="btn btn-outline-danger" type="button"
                 disabled="@_isDeleting" @onclick="HandleDeleteTaskAsync">
-            @(_isConfirmingDelete ? "Biztosan? (Megerősítés)" : "Feladat törlése")
+            Feladat torlese
         </button>
     </div>
 }
+
+<ConfirmDialog
+    IsOpen="@_isTaskDeleteDialogOpen"
+    IsBusy="@_isDeleting"
+    Title="Feladat torlese"
+    Message="A feladat torlese vegleges. Biztosan folytatod?"
+    ConfirmText="Feladat torlese"
+    BusyConfirmText="Torles..."
+    OnConfirm="ConfirmDeleteTaskAsync"
+    OnCancel="CancelDeleteTaskAsync" />
+
+<ConfirmDialog
+    IsOpen="@_pendingDeleteCommentId.HasValue"
+    IsBusy="@_deletingCommentId.HasValue"
+    Title="Komment torlese"
+    Message="Biztosan torlod ezt a kommentet?"
+    ConfirmText="Komment torlese"
+    BusyConfirmText="Torles..."
+    OnConfirm="ConfirmDeleteCommentAsync"
+    OnCancel="CancelDeleteCommentAsync" />
 
 @code {
     [Parameter]
@@ -318,12 +328,12 @@ else
     private bool _isLoading = true;
     private bool _isUpdating;
     private bool _isDeleting;
-    private bool _isConfirmingDelete;
+    private bool _isTaskDeleteDialogOpen;
     private bool _isLoadingComments;
     private bool _isCreatingComment;
     private Guid? _editingCommentId;
     private bool _isUpdatingComment;
-    private Guid? _confirmDeleteCommentId;
+    private Guid? _pendingDeleteCommentId;
     private Guid? _deletingCommentId;
 
     protected override async Task OnParametersSetAsync()
@@ -345,7 +355,10 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
     }
 
@@ -362,7 +375,10 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -386,7 +402,10 @@ else
         }
         catch (Exception ex)
         {
-            _commentsErrorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _commentsErrorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -432,7 +451,10 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -440,34 +462,40 @@ else
         }
     }
 
-    private async Task HandleDeleteTaskAsync()
+    private Task HandleDeleteTaskAsync()
     {
-        if (!_isConfirmingDelete)
-        {
-            // First click - mark for deletion to show confirmation
-            _isConfirmingDelete = true;
-        }
-        else
-        {
-            // Second click - confirmed, delete
-            _isDeleting = true;
-            _successMessage = null;
-            _errorMessage = null;
+        _isTaskDeleteDialogOpen = true;
+        return Task.CompletedTask;
+    }
 
-            try
+    private Task CancelDeleteTaskAsync()
+    {
+        _isTaskDeleteDialogOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmDeleteTaskAsync()
+    {
+        _isDeleting = true;
+        _successMessage = null;
+        _errorMessage = null;
+
+        try
+        {
+            await TasksApiClient.DeleteTaskAsync(ProjectId, TaskId);
+            NavigationManager.NavigateTo($"/app/projects/{ProjectId}/tasks");
+        }
+        catch (Exception ex)
+        {
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
             {
-                await TasksApiClient.DeleteTaskAsync(ProjectId, TaskId);
-                NavigationManager.NavigateTo($"/app/projects/{ProjectId}/tasks");
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
             }
-            catch (Exception ex)
-            {
-                _errorMessage = ex.Message;
-            }
-            finally
-            {
-                _isDeleting = false;
-                _isConfirmingDelete = false;
-            }
+        }
+        finally
+        {
+            _isDeleting = false;
+            _isTaskDeleteDialogOpen = false;
         }
     }
 
@@ -491,7 +519,10 @@ else
         }
         catch (Exception ex)
         {
-            _commentsErrorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _commentsErrorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -505,7 +536,7 @@ else
         _editCommentModel.Content = comment.Content;
         _commentsErrorMessage = null;
         _commentsSuccessMessage = null;
-        _confirmDeleteCommentId = null;
+        _pendingDeleteCommentId = null;
     }
 
     private void CancelEditComment()
@@ -538,7 +569,10 @@ else
         }
         catch (Exception ex)
         {
-            _commentsErrorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _commentsErrorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -546,14 +580,26 @@ else
         }
     }
 
-    private async Task HandleDeleteCommentAsync(Guid commentId)
+    private Task OpenDeleteCommentDialog(Guid commentId)
     {
-        if (_confirmDeleteCommentId != commentId)
+        _pendingDeleteCommentId = commentId;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelDeleteCommentAsync()
+    {
+        _pendingDeleteCommentId = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmDeleteCommentAsync()
+    {
+        if (!_pendingDeleteCommentId.HasValue)
         {
-            _confirmDeleteCommentId = commentId;
             return;
         }
 
+        var commentId = _pendingDeleteCommentId.Value;
         _deletingCommentId = commentId;
         _commentsErrorMessage = null;
         _commentsSuccessMessage = null;
@@ -571,12 +617,15 @@ else
         }
         catch (Exception ex)
         {
-            _commentsErrorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _commentsErrorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
             _deletingCommentId = null;
-            _confirmDeleteCommentId = null;
+            _pendingDeleteCommentId = null;
         }
     }
 

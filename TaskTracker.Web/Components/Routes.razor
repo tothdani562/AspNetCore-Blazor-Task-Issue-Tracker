@@ -3,7 +3,7 @@
 
 @if (!_isReady)
 {
-    <div class="auth-loading">Session betoltese...</div>
+    <LoadingIndicator Text="Session betoltese..." />
 }
 else
 {
@@ -13,7 +13,14 @@ else
                 <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
                     <NotAuthorized>
                         <LayoutView Layout="typeof(Layout.MainLayout)">
-                            <RedirectToLogin />
+                            <AuthorizeView>
+                                <Authorized Context="authContext">
+                                    <RedirectToForbidden />
+                                </Authorized>
+                                <NotAuthorized Context="anonContext">
+                                    <RedirectToLogin />
+                                </NotAuthorized>
+                            </AuthorizeView>
                         </LayoutView>
                     </NotAuthorized>
                 </AuthorizeRouteView>

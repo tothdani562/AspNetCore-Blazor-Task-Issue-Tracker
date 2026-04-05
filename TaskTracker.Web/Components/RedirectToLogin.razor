@@ -5,6 +5,6 @@
     {
         var currentUri = new Uri(NavigationManager.Uri);
         var returnUrl = Uri.EscapeDataString(currentUri.PathAndQuery);
-        NavigationManager.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: false);
+        NavigationManager.NavigateTo($"/401?returnUrl={returnUrl}", forceLoad: false);
     }
 }

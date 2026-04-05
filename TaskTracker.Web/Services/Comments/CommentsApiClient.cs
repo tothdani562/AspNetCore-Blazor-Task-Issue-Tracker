@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using TaskTracker.Web.Dtos;
 using TaskTracker.Web.Dtos.Comments;
+using TaskTracker.Web.Services.Api;
 using TaskTracker.Web.Services.Auth;
 
 namespace TaskTracker.Web.Services.Comments;
@@ -78,7 +79,7 @@ public class CommentsApiClient : ICommentsApiClient
     {
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(await ReadErrorMessageAsync(response, cancellationToken));
+            throw await ApiErrorMapper.CreateExceptionAsync(response, cancellationToken);
         }
     }
 
@@ -97,24 +98,6 @@ public class CommentsApiClient : ICommentsApiClient
 
         return data;
     }
-
-    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(cancellationToken);
-            if (!string.IsNullOrWhiteSpace(error?.Message))
-            {
-                return error.Message;
-            }
-        }
-        catch
-        {
-        }
-
-        return $"A keres nem sikerult. HTTP {(int)response.StatusCode}.";
-    }
-
     private static string BuildQueryString(GetCommentsQueryDto query)
     {
         var parameters = new List<string>();

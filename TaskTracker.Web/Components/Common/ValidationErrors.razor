@@ -1,0 +1,59 @@
+@implements IDisposable
+
+@if (_hasValidationErrors)
+{
+    <div class="tt-validation-summary">
+        <ValidationSummary />
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private EditContext? CurrentEditContext { get; set; }
+
+    private EditContext? _registeredEditContext;
+    private bool _hasValidationErrors;
+
+    protected override void OnParametersSet()
+    {
+        if (CurrentEditContext is null)
+        {
+            throw new InvalidOperationException($"{nameof(ValidationErrors)} requires a cascading parameter of type {nameof(EditContext)}.");
+        }
+
+        if (!ReferenceEquals(CurrentEditContext, _registeredEditContext))
+        {
+            Unsubscribe();
+
+            _registeredEditContext = CurrentEditContext;
+            _registeredEditContext.OnValidationStateChanged += HandleValidationStateChanged;
+        }
+
+        _hasValidationErrors = _registeredEditContext.GetValidationMessages().Any();
+    }
+
+    private void HandleValidationStateChanged(object? sender, ValidationStateChangedEventArgs e)
+    {
+        if (_registeredEditContext is null)
+        {
+            return;
+        }
+
+        _hasValidationErrors = _registeredEditContext.GetValidationMessages().Any();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Unsubscribe()
+    {
+        if (_registeredEditContext is not null)
+        {
+            _registeredEditContext.OnValidationStateChanged -= HandleValidationStateChanged;
+            _registeredEditContext = null;
+        }
+    }
+
+    public void Dispose()
+    {
+        Unsubscribe();
+    }
+}

@@ -1,0 +1,33 @@
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="tt-feedback @GetClass()" role="alert">
+        @Message
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+
+    [Parameter]
+    public FeedbackType Type { get; set; } = FeedbackType.Info;
+
+    private string GetClass()
+    {
+        return Type switch
+        {
+            FeedbackType.Success => "tt-feedback-success",
+            FeedbackType.Warning => "tt-feedback-warning",
+            FeedbackType.Error => "tt-feedback-error",
+            _ => "tt-feedback-info"
+        };
+    }
+
+    public enum FeedbackType
+    {
+        Info,
+        Success,
+        Warning,
+        Error
+    }
+}

@@ -1,4 +1,5 @@
 ﻿@inherits LayoutComponentBase
+@inject IAuthSessionStore AuthSessionStore
 
 <div class="page">
     <div class="sidebar">
@@ -7,10 +8,20 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <div class="top-row-brand">
+                <span class="top-row-app">Task Tracker</span>
+                <small class="top-row-subtitle">Blazor + ASP.NET Core</small>
+            </div>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="top-row-user">
+                        <span>@AuthSessionStore.CurrentUser?.FullName</span>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
         </div>
 
-        <article class="content px-4">
+        <article class="content px-4 py-4">
             @Body
         </article>
     </main>

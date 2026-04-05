@@ -1,0 +1,50 @@
+@if (IsOpen)
+{
+    <div class="tt-dialog-backdrop" @onclick="HandleCancel"></div>
+    <div class="tt-dialog" role="dialog" aria-modal="true" aria-labelledby="tt-dialog-title">
+        <h2 id="tt-dialog-title" class="h5 mb-2">@Title</h2>
+        <p class="text-muted mb-3">@Message</p>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-outline-secondary" type="button" @onclick="HandleCancel" disabled="@IsBusy">
+                @CancelText
+            </button>
+            <button class="btn btn-danger" type="button" @onclick="HandleConfirm" disabled="@IsBusy">
+                @(IsBusy ? BusyConfirmText : ConfirmText)
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = "Megerosites";
+
+    [Parameter]
+    public string Message { get; set; } = "Biztosan folytatod a muveletet?";
+
+    [Parameter]
+    public string ConfirmText { get; set; } = "Igen";
+
+    [Parameter]
+    public string BusyConfirmText { get; set; } = "Folyamatban...";
+
+    [Parameter]
+    public string CancelText { get; set; } = "Megse";
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private Task HandleConfirm() => OnConfirm.InvokeAsync();
+
+    private Task HandleCancel() => OnCancel.InvokeAsync();
+}

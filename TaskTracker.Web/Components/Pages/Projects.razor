@@ -10,23 +10,16 @@
 
 <h1>Projektek</h1>
 
-@if (!string.IsNullOrWhiteSpace(_errorMessage))
-{
-    <div class="alert alert-danger" role="alert">@_errorMessage</div>
-}
+<FeedbackMessage Message="@_errorMessage" Type="FeedbackMessage.FeedbackType.Error" />
+<FeedbackMessage Message="@_successMessage" Type="FeedbackMessage.FeedbackType.Success" />
 
-@if (!string.IsNullOrWhiteSpace(_successMessage))
-{
-    <div class="alert alert-success" role="alert">@_successMessage</div>
-}
-
-<section class="card mb-4">
+<section class="card mb-4 tt-form">
     <div class="card-body">
         <h2 class="h5">Uj projekt letrehozasa</h2>
 
         <EditForm Model="_createModel" OnValidSubmit="HandleCreateAsync">
             <DataAnnotationsValidator />
-            <ValidationSummary />
+            <ValidationErrors />
 
             <div class="mb-3">
                 <label class="form-label" for="createProjectName">Nev</label>
@@ -49,7 +42,7 @@
 
 @if (_isLoading)
 {
-    <p>Projektek betoltese...</p>
+    <LoadingIndicator Text="Projektek betoltese..." />
 }
 else if (_projects.Count == 0)
 {
@@ -75,11 +68,11 @@ else
                 {
                     var isOwner = project.Owner.Id == AuthSessionStore.CurrentUser?.Id;
                     <tr>
-                        <td>
-                            <strong>@project.Name</strong>
+                        <td class="tt-no-overflow">
+                            <strong class="tt-breakword">@project.Name</strong>
                             @if (!string.IsNullOrWhiteSpace(project.Description))
                             {
-                                <div class="text-muted small">@project.Description</div>
+                                <div class="text-muted small" title="@project.Description">@GetDescriptionPreview(project.Description)</div>
                             }
                         </td>
                         <td>@project.Owner.FullName</td>
@@ -94,7 +87,7 @@ else
                             <button class="btn btn-sm btn-outline-danger"
                                     type="button"
                                     disabled="@(!isOwner || _isDeleting == project.Id)"
-                                    @onclick="() => HandleDeleteAsync(project.Id)">
+                                    @onclick="() => OpenDeleteDialog(project.Id, project.Name)">
                                 @(_isDeleting == project.Id ? "Torles..." : "Torles")
                             </button>
                         </td>
@@ -105,6 +98,16 @@ else
     </div>
 }
 
+<ConfirmDialog
+    IsOpen="@_pendingDeleteProjectId.HasValue"
+    IsBusy="@_isDeleting.HasValue"
+    Title="Projekt torlese"
+    Message="@GetDeleteProjectMessage()"
+    ConfirmText="Projekt torlese"
+    BusyConfirmText="Torles..."
+    OnConfirm="ConfirmDeleteAsync"
+    OnCancel="CancelDeleteDialog" />
+
 @code {
     private readonly CreateProjectFormModel _createModel = new();
     private List<ProjectListItemDto> _projects = new();
@@ -113,6 +116,8 @@ else
     private bool _isLoading = true;
     private bool _isCreating;
     private Guid? _isDeleting;
+    private Guid? _pendingDeleteProjectId;
+    private string? _pendingDeleteProjectName;
 
     protected override async Task OnInitializedAsync()
     {
@@ -131,7 +136,10 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -159,7 +167,10 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
@@ -167,8 +178,27 @@ else
         }
     }
 
-    private async Task HandleDeleteAsync(Guid projectId)
+    private void OpenDeleteDialog(Guid projectId, string projectName)
     {
+        _pendingDeleteProjectId = projectId;
+        _pendingDeleteProjectName = projectName;
+    }
+
+    private Task CancelDeleteDialog()
+    {
+        _pendingDeleteProjectId = null;
+        _pendingDeleteProjectName = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (!_pendingDeleteProjectId.HasValue)
+        {
+            return;
+        }
+
+        var projectId = _pendingDeleteProjectId.Value;
         _isDeleting = projectId;
         _errorMessage = null;
         _successMessage = null;
@@ -181,12 +211,39 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            if (!ApiUiFlow.TryHandleNavigation(ex, NavigationManager))
+            {
+                _errorMessage = ApiUiFlow.ToUserMessage(ex);
+            }
         }
         finally
         {
             _isDeleting = null;
+            await CancelDeleteDialog();
         }
+    }
+
+    private string GetDeleteProjectMessage()
+    {
+        var projectName = string.IsNullOrWhiteSpace(_pendingDeleteProjectName)
+            ? "Ezt a projektet"
+            : $"A(z) '{_pendingDeleteProjectName}' projektet";
+
+        return $"{projectName} veglegesen torlod? Ez a muvelet nem vonhato vissza.";
+    }
+
+    private static string GetDescriptionPreview(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return string.Empty;
+        }
+
+        const int maxLength = 30;
+        var normalized = description.Trim();
+        return normalized.Length <= maxLength
+            ? normalized
+            : normalized[..maxLength] + "...";
     }
 
     private void OpenDetails(Guid projectId)
