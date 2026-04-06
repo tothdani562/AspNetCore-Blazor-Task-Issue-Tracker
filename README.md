@@ -1,4 +1,3 @@
-@ -0,0 +1,302 @@
 # Task Tracker Web (ASP.NET Core + Blazor + EF Core)
 
 Backend API + Blazor UI egy task/issue tracker rendszerhez.
